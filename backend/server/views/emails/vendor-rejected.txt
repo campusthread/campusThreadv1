@@ -1,0 +1,8 @@
+Hello, {{name}}
+
+We reviewed your vendor application for {{brandName}}.
+Unfortunately, your application was rejected.
+
+Reason: {{reason}}
+
+If you want to reapply, please update your vendor information and try again.

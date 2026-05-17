@@ -1,0 +1,4 @@
+Welcome, {{name}}!
+
+Your account has been created successfully.
+We are glad to have you here.

@@ -1,0 +1,22 @@
+Order Confirmed
+
+Hi {{name}},
+
+Your order {{orderNumber}} has been placed successfully.
+
+Status: {{status}}
+
+Items:
+{{#each items}}
+- {{name}} x{{quantity}} — ₦{{price}}
+{{/each}}
+
+Total: ₦{{totalAmount}}
+Payment method: {{paymentMethod}}
+
+{{#if shippingAddress}}
+Shipping address:
+{{shippingAddress.name}}
+{{shippingAddress.address}}
+{{shippingAddress.city}}, {{shippingAddress.state}} {{shippingAddress.zipCode}}
+{{/if}}

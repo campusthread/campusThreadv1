@@ -1,0 +1,110 @@
+<!doctype html>
+<html>
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background: #f4f7fb;
+            font-family: Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            color: #0f172a;
+        }
+
+        .wrapper {
+            width: 100%;
+            min-height: 100vh;
+            padding: 24px;
+            background: #f4f7fb;
+        }
+
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            background: #ffffff;
+            border-radius: 24px;
+            overflow: hidden;
+            box-shadow: 0 24px 80px rgba(15, 23, 42, 0.08);
+        }
+
+        .header {
+            padding: 32px;
+            background: linear-gradient(135deg, #2563eb 0%, #7c3aed 100%);
+            color: #ffffff;
+        }
+
+        .header h1 {
+            margin: 0;
+            font-size: 28px;
+            line-height: 1.1;
+            letter-spacing: -0.04em;
+        }
+
+        .content {
+            padding: 32px;
+            color: #334155;
+            line-height: 1.7;
+        }
+
+        .button {
+            display: inline-block;
+            margin-top: 28px;
+            padding: 14px 24px;
+            border-radius: 999px;
+            background: #2563eb;
+            color: #ffffff;
+            text-decoration: none;
+            font-weight: 600;
+        }
+
+        .footer {
+            padding: 24px 32px 32px;
+            color: #64748b;
+            font-size: 13px;
+            background: #f8fafc;
+            text-align: center;
+        }
+
+        p {
+            margin: 0 0 18px;
+        }
+
+        .card {
+            margin: 18px 0;
+            padding: 18px;
+            background: #f8fafc;
+            border-radius: 18px;
+        }
+
+        strong {
+            color: #0f172a;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="wrapper">
+        <div class="container">
+            <div class="header">
+                <h1>Product Published</h1>
+            </div>
+            <div class="content">
+                <p>Hi {{name}},</p>
+                <p>Your product <strong>{{productName}}</strong> is now live on CampusThread.</p>
+                <div class="card">
+                    <p><strong>Description:</strong> {{productDescription}}</p>
+                    <p><strong>Price:</strong> ₦{{productPrice}}</p>
+                </div>
+                <p>Buyers can now discover and purchase your product.</p>
+                <a class="button" href="{{appUrl}}">View product</a>
+            </div>
+            <div class="footer">
+                <p>CampusThread vendor experience — simple and elegant.</p>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

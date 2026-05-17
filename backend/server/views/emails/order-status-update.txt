@@ -1,0 +1,12 @@
+Order Status Updated
+
+Hi {{name}},
+
+Your order {{orderNumber}} status is now {{status}}.
+
+Items:
+{{#each items}}
+- {{name}} x{{quantity}} — ₦{{price}}
+{{/each}}
+
+Total: ₦{{totalAmount}}

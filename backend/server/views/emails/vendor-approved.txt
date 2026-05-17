@@ -1,0 +1,6 @@
+Congratulations, {{name}}!
+
+Your vendor account has been approved on CampusThread.
+Your store {{brandName}} is now visible to buyers.
+
+Start listing new products and grow your sales.

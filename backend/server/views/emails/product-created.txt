@@ -1,0 +1,10 @@
+Product Published
+
+Hi {{name}},
+
+Your product {{productName}} is now live on CampusThread.
+
+Description: {{productDescription}}
+Price: ₦{{productPrice}}
+
+Buyers can now discover and purchase your product.

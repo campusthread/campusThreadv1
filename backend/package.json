@@ -1,0 +1,52 @@
+{
+  "name": "miggle-backend",
+  "version": "1.0.0",
+  "description": "Production-ready Node.js + Express + MongoDB backend for MERN application",
+  "type": "module",
+  "main": "server/server.js",
+  "scripts": {
+    "start": "node server/server.js",
+    "dev": "nodemon server/server.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "express",
+    "mongodb",
+    "jwt",
+    "security"
+  ],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "bcrypt": "^6.0.0",
+    "cloudinary": "^2.9.0",
+    "compression": "^1.7.4",
+    "cookie-parser": "^1.4.6",
+    "cors": "^2.8.5",
+    "dotenv": "^16.3.1",
+    "express": "^4.18.2",
+    "express-async-errors": "^3.1.1",
+    "express-mongo-sanitize": "^2.2.0",
+    "express-rate-limit": "^7.1.5",
+    "handlebars": "^4.7.8",
+    "helmet": "^7.1.0",
+    "html-to-text": "^9.0.5",
+    "jsonwebtoken": "^9.0.3",
+    "juice": "^11.1.1",
+    "lucide-react": "^1.14.0",
+    "mongodb": "^7.2.0",
+    "mongoose": "^8.0.0",
+    "multer": "^2.0.2",
+    "redis": "^5.12.1",
+    "socket.io": "^4.8.3",
+    "streamifier": "^0.1.1",
+    "uuid": "^9.0.1",
+    "zod": "^3.22.4"
+  },
+  "devDependencies": {
+    "@types/compression": "^1.8.1",
+    "morgan": "^1.10.0",
+    "nodemailer": "^8.0.5",
+    "nodemon": "^3.0.2"
+  }
+}

@@ -1,0 +1,13 @@
+New Order Received
+
+Hi {{name}},
+
+You have received a new order {{orderNumber}} from {{buyerName}}.
+
+Items:
+{{#each items}}
+- {{name}} x{{quantity}} — ₦{{price}}
+{{/each}}
+
+Order total: ₦{{totalAmount}}
+Current status: {{status}}
