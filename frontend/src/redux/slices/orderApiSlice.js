@@ -43,6 +43,13 @@ export const orderApiSlice = apiSlice.injectEndpoints({
         body: { email },
       }),
     }),
+    initializePaymentWithOrder: builder.mutation({
+      query: (body) => ({
+        url: '/orders/initialize-payment-with-order',
+        method: 'POST',
+        body,
+      }),
+    }),
     verifyPayment: builder.query({
       query: (reference) => `/orders/payment/verify?reference=${reference}`,
       providesTags: ['Order'],
@@ -57,6 +64,7 @@ export const {
   useGetVendorOrdersQuery,
   useUpdateOrderStatusMutation,
   useInitializePaymentMutation,
+  useInitializePaymentWithOrderMutation,
   useVerifyPaymentQuery,
   useLazyVerifyPaymentQuery,
 } = orderApiSlice

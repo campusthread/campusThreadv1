@@ -6,7 +6,7 @@ import { useAuth } from '../context/AuthContext'
 
 const cx = (...classes) => classes.filter(Boolean).join(' ')
 
-export default function Navbar({ links = [] }) {
+export default function Navbar({ links = [], cta }) {
   const [menuOpen, setMenuOpen] = useState(false)
   const { theme, toggleTheme } = useTheme()
   const { isAuthenticated, logout, user } = useAuth()
@@ -15,15 +15,77 @@ export default function Navbar({ links = [] }) {
   const isDark = theme === 'dark'
 
   const closeMenu = () => setMenuOpen(false)
-  const linkClass = (path) =>
-    cx(
+
+  const linkClass = (link) => {
+    const path = link.path || link.to
+    const isActive = path && location.pathname === path
+    return cx(
       'rounded-md px-3 py-2 text-sm font-semibold transition',
-      location.pathname === path
+      isActive
         ? 'bg-violet-700 text-white'
         : isDark
           ? 'text-slate-200 hover:bg-violet-400/10 hover:text-violet-200'
-          : 'text-slate-700 hover:bg-slate-100 hover:text-slate-700',
+          : 'text-slate-700 hover:bg-slate-100 hover:text-violet-700',
     )
+  }
+
+  const renderLink = (link, mobile = false) => {
+    const className = cx(linkClass(link), mobile && 'block px-4 py-3 text-base')
+    if (link.href) {
+      const isExternal = link.href.startsWith('http')
+      return (
+        <a
+          key={link.label}
+          href={link.href}
+          className={className}
+          target={isExternal ? '_blank' : undefined}
+          rel={isExternal ? 'noopener noreferrer' : undefined}
+          onClick={closeMenu}
+        >
+          {link.label}
+        </a>
+      )
+    }
+
+    const to = link.to || link.path || '/'
+    return (
+      <Link key={link.label} to={to} className={className} onClick={closeMenu}>
+        {link.label}
+      </Link>
+    )
+  }
+
+  const renderCta = (mobile = false) => {
+    if (!cta) return null
+    const className = cx(
+      cta.className || 'inline-flex items-center justify-center rounded-lg border px-4 py-2.5 text-sm font-bold transition',
+      isDark ? 'border-white/10 bg-slate-900 text-slate-100 hover:bg-white/5' : 'border-slate-200 bg-white text-slate-950 hover:bg-violet-100',
+      mobile && 'w-full',
+    )
+
+    if (cta.href) {
+      const isExternal = cta.href.startsWith('http')
+      return (
+        <a
+          key={cta.label}
+          href={cta.href}
+          className={className}
+          target={isExternal ? '_blank' : undefined}
+          rel={isExternal ? 'noopener noreferrer' : undefined}
+          onClick={closeMenu}
+        >
+          {cta.label}
+        </a>
+      )
+    }
+
+    const path = cta.to || cta.path || '/'
+    return (
+      <Link key={cta.label} to={path} className={className} onClick={closeMenu}>
+        {cta.label}
+      </Link>
+    )
+  }
 
   const roleLinks = []
   if (isAuthenticated && user?.role === 'vendor') {
@@ -43,11 +105,8 @@ export default function Navbar({ links = [] }) {
         </Link>
 
         <div className="hidden items-center gap-1 md:flex">
-          {allLinks.map((link) => (
-            <Link key={link.path} to={link.path} className={linkClass(link.path)}>
-              {link.label}
-            </Link>
-          ))}
+          {allLinks.map((link) => renderLink(link))}
+          {renderCta()}
         </div>
 
         <div className="flex items-center gap-2">
@@ -102,11 +161,8 @@ export default function Navbar({ links = [] }) {
       {menuOpen && (
         <div className={cx('border-t px-4 py-3 md:hidden', isDark ? 'border-white/10 bg-slate-950' : 'border-slate-200 bg-white')}>
           <div className="mx-auto grid max-w-7xl gap-1">
-            {allLinks.map((link) => (
-              <Link key={link.path} to={link.path} className={cx(linkClass(link.path), 'block px-4 py-3 text-base')} onClick={closeMenu}>
-                {link.label}
-              </Link>
-            ))}
+            {allLinks.map((link) => renderLink(link, true))}
+            {renderCta(true)}
           </div>
         </div>
       )}

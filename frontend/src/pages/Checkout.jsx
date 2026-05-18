@@ -8,7 +8,7 @@ import { useTheme } from '../context/ThemeContext'
 import { useNotification } from '../hooks/useNotification'
 import { useAuth } from '../context/AuthContext'
 import { useGetCartQuery, useUpdateCartMutation } from '../redux/slices/cartFavoritesApiSlice'
-import { useCreateOrderMutation, useInitializePaymentMutation } from '../redux/slices/orderApiSlice'
+import { useInitializePaymentWithOrderMutation } from '../redux/slices/orderApiSlice'
 
 const NAV_LINKS = [
   { path: '/shop', label: 'Shop' },
@@ -39,8 +39,7 @@ export default function Checkout() {
   const [error, setError] = useState(null)
   const { data: cartData = [] } = useGetCartQuery()
   const [updateCart] = useUpdateCartMutation()
-  const [createOrder] = useCreateOrderMutation()
-  const [initializePayment] = useInitializePaymentMutation()
+  const [initializePaymentWithOrder] = useInitializePaymentWithOrderMutation()
   const cart = Array.isArray(cartData) ? cartData : []
   const subTotal = cart.reduce((sum, item) => sum + (item.price || 0) * (item.quantity || 1), 0)
   const pageClass = isDark ? 'bg-slate-950 text-slate-100' : 'bg-slate-50 text-slate-950'
@@ -70,27 +69,13 @@ export default function Checkout() {
     }))
 
     try {
-      const response = await createOrder({
-        items,
-        shippingAddress: shipping,
-        paymentMethod: 'paystack',
-      }).unwrap()
-
-      const order = response.order
-      if (!order) throw new Error('Could not create order')
-
-      const payment = await initializePayment({ orderId: order._id, email: user?.email }).unwrap()
+      const payment = await initializePaymentWithOrder({ items, shippingAddress: shipping, paymentMethod: 'paystack' }).unwrap()
       if (payment.authorization_url) {
-        setOrderSuccess('Order created. Redirecting to payment...')
+        setOrderSuccess('Redirecting to payment...')
         window.location.href = payment.authorization_url
         return
       }
-
-      setOrderSuccess('Order created successfully. Complete payment to finalize.')
-      if (isLoggedIn) {
-        await updateCart([]).unwrap()
-      }
-      setTimeout(() => navigate('/orders'), 2000)
+      setOrderSuccess('Payment initialized. Complete payment to finalize.')
     } catch (err) {
       console.error('Checkout error', err)
       const message = err?.data?.message || err?.error || err?.message || 'Checkout failed. Please try again.'

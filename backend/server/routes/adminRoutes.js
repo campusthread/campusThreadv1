@@ -13,6 +13,7 @@ import {
   rejectVendor,
   getAllVendors,
   getAllOrders,
+  sendReminderEmails,
 } from "../controllers/adminController.js";
 
 const router = Router();
@@ -35,6 +36,7 @@ router.delete("/users/:userId", deleteUser);
 router.get("/vendors/pending", getPendingVendors);
 router.get("/vendors", getAllVendors);
 router.get("/orders", getAllOrders);
+router.post("/reminders", sendReminderEmails);
 router.put("/vendors/:vendorId/approve", approveVendor);
 router.put("/vendors/:vendorId/reject", rejectVendor);
 

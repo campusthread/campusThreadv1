@@ -28,33 +28,11 @@ export const getUserProfile = async (req, res) => {
 };
 
 export const updateUserProfile = async (req, res) => {
-  const allowedFields = ["name", "phone", "university", "brandName", "socialLink", "brandDescription", "bankName", "accountNumber", "accountHolderName"];
-
-  const validationErrors = {}
-  if (req.user.role === "vendor") {
-    if ("bankName" in req.body && !req.body.bankName?.trim()) {
-      validationErrors.bankName = "Bank name is required for vendor payout details."
-    }
-    if ("accountHolderName" in req.body && !req.body.accountHolderName?.trim()) {
-      validationErrors.accountHolderName = "Account holder name is required."
-    }
-    if ("accountNumber" in req.body) {
-      const accountNumber = String(req.body.accountNumber || "").trim()
-      if (!accountNumber) {
-        validationErrors.accountNumber = "Account number is required."
-      } else if (!/^\d{8,20}$/.test(accountNumber)) {
-        validationErrors.accountNumber = "Account number must be 8–20 digits."
-      }
-    }
-  }
-
-  if (Object.keys(validationErrors).length) {
-    return sendError(res, "Validation failed", 400, validationErrors)
-  }
+  const allowedFields = ["name", "phone", "university", "brandName", "socialLink", "brandDescription"];
 
   for (const field of allowedFields) {
     if (field in req.body) {
-      req.user[field] = req.body[field]
+      req.user[field] = req.body[field];
     }
   }
 

@@ -333,6 +333,7 @@ export default function SuperAdmin() {
                   <StatCard
                     title="Total Revenue"
                     value={`₦${(dashboardStats.totalRevenue || 0).toLocaleString()}`}
+                    sensitive
                     surfaceClass={surfaceClass}
                     isDark={isDark}
                     onClick={() => navigate('/super-admin/revenue')}
@@ -350,6 +351,7 @@ export default function SuperAdmin() {
                   <StatCard
                     title="SuperAdmin Commission"
                     value={`₦${Math.round((dashboardStats.totalRevenue || 0) * 0.1).toLocaleString()}`}
+                    sensitive
                     surfaceClass={surfaceClass}
                     isDark={isDark}
                     onClick={() => navigate('/super-admin/commission')}
@@ -604,7 +606,7 @@ export default function SuperAdmin() {
                     <div key={vendor._id} className={cx('rounded-lg border p-4', isDark ? 'border-white/10 bg-slate-800' : 'border-slate-200 bg-slate-50')}>
                       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                         <div>
-                          <h3 className="font-bold">{vendor.brandName}</h3>
+                          <h3 className="font-bold text-slate-950 dark:text-slate-100">{vendor.brandName || vendor.name || 'Unknown vendor'}</h3>
                           <p className={cx('text-sm', mutedText)}>{vendor.email}</p>
                           <p className={cx('mt-1 text-sm', mutedText)}>Account: {vendor.accountHolderName}</p>
                           <p className={cx('text-sm', mutedText)}>Bank: {vendor.bankName}</p>
@@ -880,7 +882,18 @@ function Panel({ title, surfaceClass, children }) {
   )
 }
 
-function StatCard({ title, value, surfaceClass, isDark, onClick }) {
+function StatCard({ title, value, surfaceClass, isDark, onClick, sensitive = false }) {
+  let display = value
+  if (sensitive) {
+    try {
+      const saved = localStorage.getItem('dashboardShowRevenue')
+      const show = saved === 'false' ? false : true
+      if (!show) display = '••••••'
+    } catch (e) {
+      // ignore and show value by default
+    }
+  }
+
   return (
     <article
       role={onClick ? 'button' : undefined}
@@ -892,7 +905,7 @@ function StatCard({ title, value, surfaceClass, isDark, onClick }) {
       )}
     >
       <p className={cx('text-sm font-black uppercase tracking-wide', isDark ? 'text-violet-400' : 'text-violet-700')}>{title}</p>
-      <h3 className={cx('mt-3 text-3xl font-black tracking-normal', isDark ? 'text-slate-100' : 'text-slate-950')}>{value}</h3>
+      <h3 className={cx('mt-3 text-3xl font-black tracking-normal', isDark ? 'text-slate-100' : 'text-slate-950')}>{display}</h3>
     </article>
   )
 }

@@ -80,24 +80,47 @@ export default function OrderHistory() {
                 <table className="w-full min-w-[720px] text-left text-sm">
                   <thead className={isDark ? 'bg-slate-950' : 'bg-slate-100'}>
                     <tr>
-                      {['Order', 'Amount', 'Status', 'Payment', 'Date'].map((head) => (
+                      {['Order', 'Product', 'Amount', 'Status', 'Payment', 'Date / Time'].map((head) => (
                         <th key={head} className="px-5 py-4 font-black">{head}</th>
                       ))}
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-200 dark:divide-white/10">
-                    {orders.map((order) => (
-                      <tr key={order._id}>
-                        <td className="px-5 py-4">
-                          <strong>{order.orderNumber || order._id.slice(-6).toUpperCase()}</strong>
-                          <div className={cx('mt-1', mutedText)}>{order.items?.length || 0} item(s)</div>
-                        </td>
-                        <td className="px-5 py-4 font-bold">NGN {(order.totalAmount || 0).toLocaleString()}</td>
-                        <td className="px-5 py-4"><StatusPill value={order.status} /></td>
-                        <td className="px-5 py-4">{order.paymentStatus}</td>
-                        <td className="px-5 py-4">{new Date(order.createdAt).toLocaleDateString()}</td>
-                      </tr>
-                    ))}
+                    {orders.map((order) => {
+                      const created = new Date(order.createdAt)
+                      const dateText = created.toLocaleDateString()
+                      const timeText = created.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                      const productNames = order.items?.map((item) => item.name).filter(Boolean)
+
+                      return (
+                        <tr key={order._id}>
+                          <td className="px-5 py-4">
+                            <strong>{order.orderNumber || order._id.slice(-6).toUpperCase()}</strong>
+                            <div className={cx('mt-1', mutedText)}>{order.items?.length || 0} item(s)</div>
+                          </td>
+                          <td className="px-5 py-4 max-w-[240px]">
+                            <div className="text-sm font-medium text-slate-800 dark:text-slate-100">
+                              {productNames.length > 0 ? productNames[0] : 'No product name'}
+                            </div>
+                            {productNames.length > 1 && (
+                              <div className={cx('mt-1 text-xs', mutedText)}>
+                                +{productNames.length - 1} more
+                              </div>
+                            )}
+                          </td>
+                          <td className="px-5 py-4 font-bold">NGN {(order.totalAmount || 0).toLocaleString()}</td>
+                          <td className="px-5 py-4"><StatusPill value={order.status} /></td>
+                          <td className="px-5 py-4">
+                            <div className="font-semibold text-slate-900 dark:text-slate-100">{order.paymentMethod?.toUpperCase() || 'Paystack'}</div>
+                            <div className={cx('mt-1 text-sm', mutedText)}>{order.paymentStatus}</div>
+                          </td>
+                          <td className="px-5 py-4">
+                            <div>{dateText}</div>
+                            <div className={cx('mt-1 text-sm', mutedText)}>{timeText}</div>
+                          </td>
+                        </tr>
+                      )
+                    })}
                   </tbody>
                 </table>
               </div>

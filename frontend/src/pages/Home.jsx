@@ -4,17 +4,14 @@ import {
   BarChart3,
   CreditCard,
   Heart,
-  Menu,
-  Moon,
   Package,
   ShoppingBag,
   Store,
-  Sun,
   Truck,
   UserCheck,
-  X,
 } from 'lucide-react'
 import { useTheme } from '../context/ThemeContext'
+import Navbar from '../components/Navbar'
 import { usePolicyModal } from '../context/PolicyContext'
 import { useGetAdsQuery } from '../redux/slices/adApiSlice'
 
@@ -89,9 +86,8 @@ const footerGroups = [
 const cx = (...classes) => classes.filter(Boolean).join(' ')
 
 export default function Home() {
-  const { theme, toggleTheme } = useTheme()
+  const { theme } = useTheme()
   const { openPolicy } = usePolicyModal()
-  const [menuOpen, setMenuOpen] = useState(false)
   const isDark = theme === 'dark'
 
   // Fetch ads from API instead of localStorage
@@ -124,12 +120,6 @@ export default function Home() {
     : 'border-slate-200 bg-white text-slate-950 shadow-slate-200/70'
   const mutedText = isDark ? 'text-slate-300' : 'text-slate-600'
   const featuredAd = ads.find((ad) => ad?.imageUrl) || null
-  const linkClass = cx(
-    'rounded-md px-3 py-2 text-sm font-semibold transition',
-    isDark
-      ? 'text-slate-200 hover:bg-violet-400/10 hover:text-violet-200'
-      : 'text-slate-700 hover:bg-violet-100 hover:text-violet-700',
-  )
   const primaryButton =
     'inline-flex items-center justify-center gap-2 rounded-lg bg-violet-700 px-5 py-3 text-sm font-bold text-white shadow-lg shadow-violet-900/20 transition hover:bg-violet-800 focus:outline-none focus:ring-2 focus:ring-violet-400 focus:ring-offset-2'
   const secondaryButton = cx(
@@ -139,72 +129,9 @@ export default function Home() {
       : 'border-violet-700 text-violet-700 hover:bg-violet-50',
   )
 
-  const renderNavItem = (item, mobile = false) => {
-    const className = mobile
-      ? cx(linkClass, 'block w-full px-4 py-3 text-base')
-      : linkClass
-
-    return item.to ? (
-      <Link key={item.label} to={item.to} className={className} onClick={() => setMenuOpen(false)}>
-        {item.label}
-      </Link>
-    ) : (
-      <a key={item.label} href={item.href} className={className} onClick={() => setMenuOpen(false)}>
-        {item.label}
-      </a>
-    )
-  }
-
   return (
     <div className={cx('min-h-screen transition-colors duration-300', pageClass)}>
-      <header className={cx('sticky top-0 z-50 border-b backdrop-blur-xl', isDark ? 'border-white/10 bg-slate-950/90' : 'border-slate-200 bg-white/90')}>
-        <nav className="mx-auto flex min-h-16 max-w-7xl items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
-          <Link to="/" className="text-xl font-black uppercase tracking-normal text-violet-700">
-            Campus<span className={isDark ? 'text-slate-100' : 'text-slate-950'}>Thread</span>
-          </Link>
-
-          <div className="hidden items-center gap-1 md:flex">
-            {navLinks.map((item) => renderNavItem(item))}
-          </div>
-
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={toggleTheme}
-              className={cx('inline-flex h-10 w-10 items-center justify-center rounded-lg transition', isDark ? 'bg-slate-800 text-amber-200 hover:bg-slate-700' : 'bg-slate-100 text-slate-700 hover:bg-violet-100')}
-              title="Toggle Dark Mode"
-              aria-label="Toggle Dark Mode"
-            >
-              {isDark ? <Sun size={18} /> : <Moon size={18} />}
-            </button>
-
-            <Link to="/auth" className="hidden rounded-lg bg-violet-700 px-4 py-2 text-sm font-bold text-white transition hover:bg-violet-800 sm:inline-flex">
-              Sign In
-            </Link>
-
-            <button
-              type="button"
-              className={cx('inline-flex h-10 w-10 items-center justify-center rounded-lg md:hidden', isDark ? 'bg-slate-800 text-slate-100' : 'bg-slate-100 text-slate-900')}
-              onClick={() => setMenuOpen((open) => !open)}
-              aria-label="Toggle navigation menu"
-              aria-expanded={menuOpen}
-            >
-              {menuOpen ? <X size={20} /> : <Menu size={20} />}
-            </button>
-          </div>
-        </nav>
-
-        {menuOpen && (
-          <div className={cx('border-t px-4 py-3 md:hidden', isDark ? 'border-white/10 bg-slate-950' : 'border-slate-200 bg-white')}>
-            <div className="mx-auto flex max-w-7xl flex-col gap-1">
-              {navLinks.map((item) => renderNavItem(item, true))}
-              <Link to="/auth" className={cx(primaryButton, 'mt-2 w-full')} onClick={() => setMenuOpen(false)}>
-                Sign In
-              </Link>
-            </div>
-          </div>
-        )}
-      </header>
+      <Navbar links={navLinks} cta={{ to: '/auth', label: 'Sign In' }} />
 
       <main>
         <section className="mx-auto grid min-h-[calc(100vh-4rem)] max-w-7xl items-center gap-12 px-4 py-16 sm:px-6 lg:grid-cols-[1.05fr_0.95fr] lg:px-8">
@@ -266,7 +193,7 @@ export default function Home() {
                     <div className="absolute inset-0 bg-gradient-to-t from-slate-950/85 via-slate-950/20 to-transparent" />
                     <div className="absolute inset-x-0 bottom-0 p-6 text-white">
                       <p className="mb-2 inline-flex rounded-full bg-white/15 px-3 py-1 text-xs font-bold uppercase tracking-wide backdrop-blur">
-                        Sponsored
+                        Advertisement
                       </p>
                       <h2 className="text-2xl font-black tracking-normal">{currentAd.title}</h2>
                       <p className="mt-2 line-clamp-2 text-sm leading-6 text-slate-100">{currentAd.description}</p>

@@ -1,18 +1,19 @@
-import { useMemo, useState, useEffect } from 'react'
+import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useDispatch } from 'react-redux'
-import { ArrowLeft, IdCard, PenLine } from 'lucide-react'
+import { ArrowLeft, IdCard, PenLine, Upload } from 'lucide-react'
 import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
 import NotificationToast from '../components/NotificationToast'
 import { useTheme } from '../context/ThemeContext'
 import { useNotification } from '../hooks/useNotification'
 import { useAuth } from '../context/AuthContext'
-import { useGetUserOrdersQuery, useGetVendorOrdersQuery } from '../redux/slices/orderApiSlice'
 import { setCredentials } from '../redux/slices/authSlice'
 import {
   useUpdateUserProfileMutation,
+  useUploadUserProfilePictureMutation,
 } from '../redux/slices/userApiSlice'
+import { useGetUserOrdersQuery } from '../redux/slices/orderApiSlice'
 
 const NAV_LINKS = [
   { path: '/', label: 'Home' },
@@ -31,6 +32,8 @@ export default function Profile() {
   const { user } = useAuth()
   const dispatch = useDispatch()
   const [updateUserProfile] = useUpdateUserProfileMutation()
+  const [uploadUserProfilePicture] = useUploadUserProfilePictureMutation()
+  const [profileFile, setProfileFile] = useState(null)
   const [saving, setSaving] = useState(false)
   const [formData, setFormData] = useState({
     name: user?.name || '',
@@ -38,11 +41,7 @@ export default function Profile() {
     university: user?.university || '',
     brandName: user?.brandName || '',
     socialLink: user?.socialLink || '',
-    bankName: user?.bankName || '',
-    accountNumber: user?.accountNumber || '',
-    accountHolderName: user?.accountHolderName || user?.name || '',
   })
-  const [formErrors, setFormErrors] = useState({})
   const pageClass = isDark ? 'bg-slate-950 text-slate-100' : 'bg-slate-50 text-slate-950'
   const surfaceClass = isDark ? 'border-white/10 bg-slate-900 text-slate-100 shadow-black/30' : 'border-slate-200 bg-white text-slate-950 shadow-slate-200/70'
   const softClass = isDark ? 'border-white/10 bg-slate-950' : 'border-slate-200 bg-slate-50'
@@ -60,56 +59,9 @@ export default function Profile() {
       profileImage: user.profileImage || user.storeImage || '',
       brandName: user.brandName || user.storeName || 'Not available',
       socialLink: user.socialLink || user.website || 'Not available',
-      bankName: user.bankName || 'Not set',
-      accountNumber: user.accountNumber || 'Not set',
-      accountHolderName: user.accountHolderName || 'Not set',
       joined: new Date(user.createdAt || Date.now()).toLocaleDateString(),
     }
   }, [user])
-
-  // Orders (show recent orders on profile)
-  const isVendor = user?.role === 'vendor'
-  const vendorQuery = useGetVendorOrdersQuery(undefined, { skip: !isVendor })
-  const userQuery = useGetUserOrdersQuery(undefined, { skip: isVendor || !user })
-  const [orders, setOrders] = useState([])
-  const [ordersLoading, setOrdersLoading] = useState(true)
-  const [ordersError, setOrdersError] = useState(null)
-
-  useEffect(() => {
-    const response = isVendor ? vendorQuery.data : userQuery.data
-    const requestError = isVendor ? vendorQuery.error : userQuery.error
-    const requestLoading = isVendor ? vendorQuery.isFetching : userQuery.isFetching
-
-    setOrdersLoading(requestLoading)
-    if (response?.orders) {
-      setOrders(response.orders.slice(0, 5))
-      setOrdersError(null)
-      return
-    }
-    if (requestError) setOrdersError(requestError?.data?.message || requestError?.error || 'Unable to load orders')
-  }, [isVendor, userQuery.data, userQuery.error, userQuery.isFetching, vendorQuery.data, vendorQuery.error, vendorQuery.isFetching])
-
-  const validateProfile = () => {
-    const errors = {}
-
-    if (user?.role === 'vendor') {
-      if (!formData.bankName.trim()) {
-        errors.bankName = 'Bank name is required for payout updates.'
-      }
-      if (!formData.accountHolderName.trim()) {
-        errors.accountHolderName = 'Account holder name is required.'
-      }
-      const accountNumber = formData.accountNumber.trim()
-      if (!accountNumber) {
-        errors.accountNumber = 'Account number is required.'
-      } else if (!/^\d{8,20}$/.test(accountNumber)) {
-        errors.accountNumber = 'Account number must be 8–20 digits.'
-      }
-    }
-
-    setFormErrors(errors)
-    return Object.keys(errors).length === 0
-  }
 
   const syncUser = (nextUser) => {
     const token = localStorage.getItem('accessToken')
@@ -117,16 +69,23 @@ export default function Profile() {
     dispatch(setCredentials({ user: nextUser, token }))
   }
 
-  const handleProfileSave = async () => {
-    if (!validateProfile()) {
-      return
-    }
+  const { data: orderData, isFetching: ordersLoading, error: ordersError } = useGetUserOrdersQuery(undefined, {
+    skip: !user || user.role === 'vendor',
+  })
+  const orders = orderData?.orders || []
 
+  const handleProfileSave = async () => {
     try {
       setSaving(true)
       let nextUser = user
       const profileResponse = await updateUserProfile(formData).unwrap()
       nextUser = { ...nextUser, ...profileResponse.user }
+
+      if (profileFile) {
+        const uploadResponse = await uploadUserProfilePicture(profileFile).unwrap()
+        nextUser = { ...nextUser, ...uploadResponse.user }
+        setProfileFile(null)
+      }
 
       syncUser(nextUser)
       showNotification('Profile updated successfully!', 'success')
@@ -135,6 +94,16 @@ export default function Profile() {
     } finally {
       setSaving(false)
     }
+  }
+
+  const handleFileSelect = (event) => {
+    const file = event.target.files?.[0]
+    if (!file) return
+    if (!file.type.startsWith('image/')) {
+      showNotification('Please choose a valid image file.', 'error')
+      return
+    }
+    setProfileFile(file)
   }
 
   return (
@@ -161,9 +130,13 @@ export default function Profile() {
         <section className="grid gap-6 lg:grid-cols-5">
           <div className={cx('rounded-2xl border p-6 shadow-lg lg:col-span-3', surfaceClass)}>
             <div className="mb-6 flex items-center gap-5">
-              <div className="grid h-24 w-24 place-items-center rounded-full bg-violet-700 text-2xl font-black text-white">
-                {profileData.name?.charAt(0)?.toUpperCase()}
-              </div>
+              {profileData.profileImage ? (
+                <img src={profileData.profileImage} alt={profileData.name} className="h-24 w-24 rounded-full border-4 border-white object-cover" />
+              ) : (
+                <div className="grid h-24 w-24 place-items-center rounded-full bg-violet-700 text-2xl font-black text-white">
+                  {profileData.name?.charAt(0)?.toUpperCase()}
+                </div>
+              )}
               <div>
                 <h2 className="text-2xl font-black tracking-normal">{profileData.name}</h2>
                 <p className={mutedText}>{profileData.role?.charAt(0).toUpperCase() + profileData.role?.slice(1)}</p>
@@ -183,48 +156,22 @@ export default function Profile() {
                 </div>
               ))}
             </div>
-            {isVendor && (
-              <div className={cx('mt-6 rounded-xl border p-4', softClass)}>
-                <h3 className="text-sm font-black uppercase tracking-wide text-violet-700">Vendor payout details</h3>
-                <div className={cx('mt-3 grid gap-3 text-sm', mutedText)}>
-                  <div>
-                    <p className="text-xs uppercase tracking-wide text-slate-400">Account Holder</p>
-                    <p className="mt-1 font-semibold">{profileData.accountHolderName}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs uppercase tracking-wide text-slate-400">Bank</p>
-                    <p className="mt-1 font-semibold">{profileData.bankName}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs uppercase tracking-wide text-slate-400">Account Number</p>
-                    <p className="mt-1 font-semibold">{profileData.accountNumber}</p>
-                  </div>
-                </div>
-              </div>
-            )}
           </div>
 
           <aside className={cx('rounded-2xl border p-6 shadow-lg lg:col-span-2', surfaceClass)}>
             <h3 className="text-xl font-black tracking-normal">Account Details</h3>
             <div className="mt-5 grid gap-4">
+              <label className={cx('rounded-xl border p-4', softClass)}>
+                <span className={cx('flex items-center gap-2 text-sm font-bold', mutedText)}><Upload size={16} /> Profile Picture</span>
+                <input type="file" accept="image/*" onChange={handleFileSelect} className="mt-3 w-full text-sm" />
+                {profileFile && <p className="mt-2 text-sm font-semibold">{profileFile.name}</p>}
+              </label>
               <Field label="Full Name"><input value={formData.name} onChange={(event) => setFormData((prev) => ({ ...prev, name: event.target.value }))} className={inputClass} /></Field>
               <Field label="Phone"><input value={formData.phone} onChange={(event) => setFormData((prev) => ({ ...prev, phone: event.target.value }))} className={inputClass} /></Field>
               <Field label="University"><input value={formData.university} onChange={(event) => setFormData((prev) => ({ ...prev, university: event.target.value }))} className={inputClass} /></Field>
               {user?.role === 'vendor' ? (
                 <>
                   <Field label="Store / Brand Name"><input value={formData.brandName} onChange={(event) => setFormData((prev) => ({ ...prev, brandName: event.target.value }))} className={inputClass} /></Field>
-                  <Field label="Bank Name">
-                    <input value={formData.bankName} onChange={(event) => { setFormData((prev) => ({ ...prev, bankName: event.target.value })); setFormErrors((prev) => ({ ...prev, bankName: undefined })) }} className={inputClass} />
-                    {formErrors.bankName && <p className="mt-1 text-xs text-red-500">{formErrors.bankName}</p>}
-                  </Field>
-                  <Field label="Account Number">
-                    <input value={formData.accountNumber} onChange={(event) => { setFormData((prev) => ({ ...prev, accountNumber: event.target.value })); setFormErrors((prev) => ({ ...prev, accountNumber: undefined })) }} className={inputClass} />
-                    {formErrors.accountNumber && <p className="mt-1 text-xs text-red-500">{formErrors.accountNumber}</p>}
-                  </Field>
-                  <Field label="Account Holder">
-                    <input value={formData.accountHolderName} onChange={(event) => { setFormData((prev) => ({ ...prev, accountHolderName: event.target.value })); setFormErrors((prev) => ({ ...prev, accountHolderName: undefined })) }} className={inputClass} />
-                    {formErrors.accountHolderName && <p className="mt-1 text-xs text-red-500">{formErrors.accountHolderName}</p>}
-                  </Field>
                   <Field label="Social Link"><input value={formData.socialLink} onChange={(event) => setFormData((prev) => ({ ...prev, socialLink: event.target.value }))} className={inputClass} /></Field>
                 </>
               ) : (
@@ -247,52 +194,93 @@ export default function Profile() {
           </aside>
         </section>
 
-        <section className="mt-8 lg:col-span-5">
-          <h3 className="text-xl font-black tracking-normal">Recent Orders</h3>
-          <div className="mt-4">
-            {ordersLoading && <p className={mutedText}>Loading orders...</p>}
-            {ordersError && <div className="mb-5 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">{ordersError}</div>}
+        {user?.role !== 'vendor' && (
+          <section className={cx('mt-10 rounded-2xl border p-6 shadow-lg', surfaceClass)}>
+            <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <h2 className="text-2xl font-black tracking-normal">Recent Orders</h2>
+                <p className={cx('mt-2 text-sm', mutedText)}>Your latest buyer order history is shown here.</p>
+              </div>
+              <Link
+                to="/orders"
+                className={cx(
+                  'inline-flex items-center justify-center rounded-lg border px-4 py-2.5 text-sm font-bold transition focus:outline-none focus:ring-2 focus:ring-violet-500/20',
+                  isDark
+                    ? 'border-white/10 bg-slate-900 text-slate-100 hover:bg-white/5'
+                    : 'border-slate-200 bg-white text-slate-950 hover:bg-violet-100'
+                )}
+              >
+                View full order history
+              </Link>
+            </div>
 
-            {orders.length === 0 && !ordersLoading ? (
-              <div className={cx('rounded-2xl border-2 border-dashed p-8 text-center', isDark ? 'border-white/10 text-slate-400' : 'border-slate-200 text-slate-500')}>
-                <p className="font-semibold">No recent orders.</p>
-                <Link to="/shop" className="mt-4 inline-flex rounded-lg bg-violet-700 px-4 py-2 text-sm font-bold text-white transition hover:bg-violet-800">Browse products</Link>
+            {ordersLoading && <p className={mutedText}>Loading order history...</p>}
+            {ordersError && (
+              <div className="mb-5 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">
+                {ordersError?.data?.message || ordersError?.error || 'Unable to load orders.'}
+              </div>
+            )}
+
+            {!ordersLoading && orders.length === 0 ? (
+              <div className={cx('rounded-2xl border-2 border-dashed p-10 text-center', isDark ? 'border-white/10 text-slate-400' : 'border-slate-200 text-slate-500')}>
+                <p className="text-lg font-bold">No orders yet</p>
+                <p className="mt-2 text-sm">Once you place an order, it will appear here in your profile.</p>
               </div>
             ) : (
               orders.length > 0 && (
-                <div className={cx('overflow-hidden rounded-2xl border mt-4 shadow-lg', surfaceClass)}>
+                <div className="overflow-hidden rounded-2xl border shadow-lg">
                   <div className="overflow-x-auto">
-                    <table className="w-full min-w-[640px] text-left text-sm">
+                    <table className="w-full min-w-[720px] text-left text-sm">
                       <thead className={isDark ? 'bg-slate-950' : 'bg-slate-100'}>
                         <tr>
-                          {['Order', 'Amount', 'Status', 'Date'].map((head) => (
-                            <th key={head} className="px-4 py-3 font-black">{head}</th>
+                          {['Order', 'Product', 'Amount', 'Status', 'Payment', 'Date / Time'].map((head) => (
+                            <th key={head} className="px-5 py-4 font-black">{head}</th>
                           ))}
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-200 dark:divide-white/10">
-                        {orders.map((order) => (
-                          <tr key={order._id}>
-                            <td className="px-4 py-3">
-                              <strong>{order.orderNumber || (order._id || '').slice(-6).toUpperCase()}</strong>
-                              <div className={cx('mt-1', mutedText)}>{order.items?.length || 0} item(s)</div>
-                            </td>
-                            <td className="px-4 py-3 font-bold">NGN {(order.totalAmount || 0).toLocaleString()}</td>
-                            <td className="px-4 py-3"><StatusPill value={order.status} /></td>
-                            <td className="px-4 py-3">{new Date(order.createdAt).toLocaleDateString()}</td>
-                          </tr>
-                        ))}
+                        {orders.map((order) => {
+                          const created = new Date(order.createdAt)
+                          const dateText = created.toLocaleDateString()
+                          const timeText = created.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                          const productNames = order.items?.map((item) => item.name).filter(Boolean)
+                          return (
+                            <tr key={order._id}>
+                              <td className="px-5 py-4">
+                                <strong>{order.orderNumber || order._id.slice(-6).toUpperCase()}</strong>
+                                <div className={cx('mt-1', mutedText)}>{order.items?.length || 0} item(s)</div>
+                              </td>
+                              <td className="px-5 py-4 max-w-[240px]">
+                                <div className={cx('text-sm font-medium', isDark ? 'text-slate-100' : 'text-slate-900')}>
+                                  {productNames.length > 0 ? productNames[0] : 'No product name'}
+                                </div>
+                                {productNames.length > 1 && (
+                                  <div className={cx('mt-1 text-xs', mutedText)}>
+                                    +{productNames.length - 1} more
+                                  </div>
+                                )}
+                              </td>
+                              <td className="px-5 py-4 font-bold">NGN {(order.totalAmount || 0).toLocaleString()}</td>
+                              <td className="px-5 py-4"><StatusPill value={order.status} /></td>
+                              <td className="px-5 py-4">
+                                <div className={cx('font-semibold', isDark ? 'text-slate-100' : 'text-slate-900')}>{order.paymentMethod?.toUpperCase() || 'Paystack'}</div>
+                                <div className={cx('mt-1 text-sm', mutedText)}>{order.paymentStatus}</div>
+                              </td>
+                              <td className="px-5 py-4">
+                                <div>{dateText}</div>
+                                <div className={cx('mt-1 text-sm', mutedText)}>{timeText}</div>
+                              </td>
+                            </tr>
+                          )
+                        })}
                       </tbody>
                     </table>
-                  </div>
-                  <div className="p-4 text-right">
-                    <Link to="/orders" className="inline-flex items-center gap-2 rounded-lg border px-4 py-2 text-sm font-bold transition">View all orders</Link>
                   </div>
                 </div>
               )
             )}
-          </div>
-        </section>
+          </section>
+        )}
       </main>
 
       <Footer />
@@ -324,5 +312,5 @@ function StatusPill({ value }) {
     : value === 'delivered'
       ? 'bg-emerald-100 text-emerald-800'
       : 'bg-blue-100 text-blue-800'
-  return <span className={`rounded-full px-3 py-1 text-xs font-black uppercase ${tone}`}>{value}</span>
+  return <span className={cx('rounded-full px-3 py-1 text-xs font-black uppercase', tone)}>{value}</span>
 }

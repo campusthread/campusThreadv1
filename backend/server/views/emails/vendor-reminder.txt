@@ -1,0 +1,11 @@
+{{headline}}
+
+Hello {{name}},
+
+{{message}}
+
+Upload your latest products now: {{ctaUrl}}
+
+Best,
+{{appName}}
+{{appUrl}}

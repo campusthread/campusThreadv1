@@ -1,0 +1,11 @@
+{{headline}}
+
+Hi {{name}},
+
+{{message}}
+
+Browse campus products and deals now: {{ctaUrl}}
+
+Thanks,
+{{appName}}
+{{appUrl}}

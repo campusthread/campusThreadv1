@@ -102,9 +102,10 @@ export default function RevenueReport({ role }) {
         })
     }, [orders, filter])
 
-    const totalRevenue = filteredOrders.reduce((sum, order) => sum + Number(order.totalAmount || order.total || 0), 0)
-    const deliveredCount = filteredOrders.filter((order) => order.status === 'delivered').length
-    const orderCount = filteredOrders.length
+    const paidOrders = filteredOrders.filter((order) => order.paymentStatus === 'paid')
+    const totalRevenue = paidOrders.reduce((sum, order) => sum + Number(order.totalAmount || order.total || 0), 0)
+    const deliveredCount = paidOrders.filter((order) => order.status === 'delivered').length
+    const orderCount = paidOrders.length
     const pageTitle = role === 'admin' ? 'Platform Revenue' : 'Store Revenue'
     const backPath = role === 'admin' ? '/super-admin' : '/vendor-admin'
 

@@ -77,6 +77,58 @@ export const sendProductPublishedEmail = async (vendor, product) => {
     });
 };
 
+export const sendPasswordResetEmail = async (user, resetUrl) => {
+    return safeSendEmail({
+        to: user.email,
+        subject: `Reset your CampusThread password`,
+        template: "password-reset",
+        context: {
+            name: user.name,
+            resetUrl,
+        },
+    });
+};
+
+export const sendPasswordResetConfirmation = async (user) => {
+    return safeSendEmail({
+        to: user.email,
+        subject: `Your CampusThread password has been updated`,
+        template: "password-reset-confirmation",
+        context: {
+            name: user.name,
+        },
+    });
+};
+
+export const sendBuyerPromotionEmail = async (buyer, { headline, message, ctaUrl } = {}) => {
+    return safeSendEmail({
+        to: buyer.email,
+        subject: `New deals and campus picks just for you`,
+        template: "buyer-reminder",
+        context: {
+            name: buyer.name,
+            headline: headline || "Fresh campus deals are waiting",
+            message: message || "Discover trending products and exclusive offers from student vendors on CampusThread.",
+            ctaUrl: ctaUrl || `${appUrl}/shop`,
+        },
+    });
+};
+
+export const sendVendorUploadReminderEmail = async (vendor, { headline, message, ctaUrl } = {}) => {
+    return safeSendEmail({
+        to: vendor.email,
+        subject: `Upload new products and boost your CampusThread sales`,
+        template: "vendor-reminder",
+        context: {
+            name: vendor.name,
+            brandName: vendor.brandName || vendor.name,
+            headline: headline || "Keep your store fresh with new products",
+            message: message || "Students are browsing right now — upload your latest items to reach more buyers.",
+            ctaUrl: ctaUrl || `${appUrl}/vendor-admin`,
+        },
+    });
+};
+
 export const sendBuyerOrderConfirmation = async (order, buyer) => {
     return safeSendEmail({
         to: buyer.email,

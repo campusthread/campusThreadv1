@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { Eye, EyeOff, Loader2, LogIn, ShoppingBag, Store, UserPlus } from 'lucide-react'
+import { Eye, EyeOff, LogIn, ShoppingBag, Store, UserPlus } from 'lucide-react'
 import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
 import { useTheme } from '../context/ThemeContext'
@@ -25,14 +25,15 @@ export default function Auth() {
   const [signinPassword, setSigninPassword] = useState('')
   const [rememberMe, setRememberMe] = useState(false)
   const [showSigninPass, setShowSigninPass] = useState(false)
+  const [signinLoading, setSigninLoading] = useState(false)
   const [selectedRole, setSelectedRole] = useState('customer')
   const [signupStep, setSignupStep] = useState('role')
   const [signupData, setSignupData] = useState({
     name: '', email: '', phone: '', university: '',
     brandName: '', socialLink: '', password: '', confirmPassword: '',
   })
+  const [signupLoading, setSignupLoading] = useState(false)
   const [agreeTOS, setAgreeTOS] = useState(false)
-  const [authLoading, setAuthLoading] = useState(false)
   const [showSignupPass, setShowSignupPass] = useState(false)
   const [showConfirmPass, setShowConfirmPass] = useState(false)
   const { login, register } = useAuth()
@@ -42,6 +43,26 @@ export default function Auth() {
   const surfaceClass = isDark ? 'border-white/10 bg-slate-900 text-slate-100 shadow-black/30' : 'border-slate-200 bg-white text-slate-950 shadow-slate-200/70'
   const mutedText = isDark ? 'text-slate-300' : 'text-slate-600'
   const inputClass = cx('mt-2 w-full rounded-lg border px-3 py-2.5 text-sm outline-none transition focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20', isDark ? 'border-white/10 bg-slate-950 text-slate-100' : 'border-slate-200 bg-white text-slate-950')
+
+  const passwordRequirements = [
+    { label: 'At least 8 characters', validator: (value) => value.length >= 8 },
+    { label: 'Uppercase letter', validator: (value) => /[A-Z]/.test(value) },
+    { label: 'Lowercase letter', validator: (value) => /[a-z]/.test(value) },
+    { label: 'Special character', validator: (value) => /[^A-Za-z0-9]/.test(value) },
+  ]
+
+  const signupPasswordCriteria = passwordRequirements.map((requirement) => ({
+    ...requirement,
+    valid: requirement.validator(signupData.password),
+  }))
+
+  const passwordStrength = (() => {
+    const validCount = signupPasswordCriteria.filter((item) => item.valid).length
+    if (validCount <= 1) return { label: 'Weak', color: 'bg-rose-500' }
+    if (validCount === 2) return { label: 'Fair', color: 'bg-amber-500' }
+    if (validCount === 3) return { label: 'Good', color: 'bg-sky-500' }
+    return { label: 'Strong', color: 'bg-emerald-500' }
+  })()
 
   useEffect(() => {
     const remembered = localStorage.getItem('rememberEmail')
@@ -58,13 +79,14 @@ export default function Auth() {
 
   const handleSignIn = async (event) => {
     event.preventDefault()
-    if (!signinEmail || !signinPassword) {
+    setAlert(null)
+    if (!signinEmail.trim() || !signinPassword) {
       showAlert('Please fill in all fields', 'error')
       return
     }
 
+    setSigninLoading(true)
     try {
-      setAuthLoading(true)
       const response = await login(signinEmail, signinPassword)
       if (rememberMe) localStorage.setItem('rememberEmail', signinEmail)
       else localStorage.removeItem('rememberEmail')
@@ -73,21 +95,47 @@ export default function Auth() {
     } catch (err) {
       showAlert(err.message || 'Invalid email or password', 'error')
     } finally {
-      setAuthLoading(false)
+      setSigninLoading(false)
     }
   }
 
   const handleSignUp = async (event) => {
     event.preventDefault()
+    setAlert(null)
     const { name, email, phone, university, password, confirmPassword, brandName, socialLink } = signupData
-    if (!name || !email || !university || !password || !confirmPassword) return showAlert('Please fill in all required fields', 'error')
-    if (password !== confirmPassword) return showAlert('Passwords do not match', 'error')
-    if (password.length < 6) return showAlert('Password must be at least 6 characters', 'error')
-    if (!agreeTOS) return showAlert('You must agree to the Terms of Service', 'error')
-    if (selectedRole === 'vendor' && (!brandName || !socialLink)) return showAlert('Please fill in all vendor fields', 'error')
 
+    if (!name.trim() || !email.trim() || !university.trim() || !password || !confirmPassword) {
+      showAlert('Please fill in all required fields', 'error')
+      return
+    }
+
+    if (password !== confirmPassword) {
+      showAlert('Passwords do not match', 'error')
+      return
+    }
+
+    if (password.length < 8) {
+      showAlert('Password must be at least 8 characters', 'error')
+      return
+    }
+
+    if (!/[A-Z]/.test(password) || !/[a-z]/.test(password) || !/[^A-Za-z0-9]/.test(password)) {
+      showAlert('Password must include uppercase, lowercase, and special characters', 'error')
+      return
+    }
+
+    if (!agreeTOS) {
+      showAlert('You must agree to the Terms of Service', 'error')
+      return
+    }
+
+    if (selectedRole === 'vendor' && (!brandName.trim() || !socialLink.trim())) {
+      showAlert('Please fill in all vendor fields', 'error')
+      return
+    }
+
+    setSignupLoading(true)
     try {
-      setAuthLoading(true)
       const response = await register({
         name,
         email,
@@ -103,7 +151,7 @@ export default function Auth() {
     } catch (err) {
       showAlert(err.message || 'Registration failed', 'error')
     } finally {
-      setAuthLoading(false)
+      setSignupLoading(false)
     }
   }
 
@@ -150,13 +198,18 @@ export default function Auth() {
             <form onSubmit={handleSignIn} className="mt-6 grid gap-5">
               <Field label="Email Address"><input type="email" placeholder="you@example.com" value={signinEmail} onChange={(event) => setSigninEmail(event.target.value)} required className={inputClass} /></Field>
               <PasswordField label="Password" value={signinPassword} show={showSigninPass} setShow={setShowSigninPass} onChange={setSigninPassword} inputClass={inputClass} />
-              <label className="flex items-center gap-2 text-sm font-semibold">
-                <input type="checkbox" checked={rememberMe} onChange={(event) => setRememberMe(event.target.checked)} className="h-4 w-4 accent-violet-700" />
-                Remember me
-              </label>
-              <button type="submit" disabled={authLoading} className="inline-flex items-center justify-center gap-2 rounded-lg bg-violet-700 px-5 py-3 text-sm font-bold text-white transition hover:bg-violet-800 disabled:cursor-not-allowed disabled:opacity-70">
-                {authLoading ? <Loader2 size={18} className="animate-spin" /> : <LogIn size={18} />}
-                {authLoading ? 'Signing In...' : 'Sign In'}
+              <div className="flex flex-col gap-3">
+                <label className="flex items-center gap-2 text-sm font-semibold">
+                  <input type="checkbox" checked={rememberMe} onChange={(event) => setRememberMe(event.target.checked)} className="h-4 w-4 accent-violet-700" />
+                  Remember me
+                </label>
+                <div className="text-right text-sm">
+                  <Link to="/forgot-password" className="font-bold text-violet-700 underline">Forgot password?</Link>
+                </div>
+              </div>
+              <button type="submit" disabled={signinLoading} className="inline-flex items-center justify-center gap-2 rounded-lg bg-violet-700 px-5 py-3 text-sm font-bold text-white transition hover:bg-violet-800 disabled:cursor-not-allowed disabled:opacity-60">
+                <LogIn size={18} />
+                {signinLoading ? 'Signing in...' : 'Sign In'}
               </button>
               <p className={cx('text-center text-sm', mutedText)}>
                 Don&apos;t have an account? <button type="button" onClick={() => setActiveTab('signup')} className="font-bold text-violet-700 underline">Sign up here</button>
@@ -208,6 +261,23 @@ export default function Auth() {
                 </>
               )}
               <PasswordField label="Password" value={signupData.password} show={showSignupPass} setShow={setShowSignupPass} onChange={(value) => setSignupData({ ...signupData, password: value })} inputClass={inputClass} />
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700 dark:border-white/10 dark:bg-slate-950 dark:text-slate-200">
+                <div className="flex items-center justify-between gap-3">
+                  <p className="font-semibold">Password strength</p>
+                  <span className={cx('rounded-full px-2 py-1 text-xs font-bold', passwordStrength.color, 'text-white')}>{passwordStrength.label}</span>
+                </div>
+                <div className="mt-3 h-2 overflow-hidden rounded-full bg-slate-200 dark:bg-slate-800">
+                  <div className={cx('h-full rounded-full', passwordStrength.color)} style={{ width: `${(signupPasswordCriteria.filter((item) => item.valid).length / signupPasswordCriteria.length) * 100}%` }} />
+                </div>
+                <div className="mt-3 grid gap-2 text-xs">
+                  {signupPasswordCriteria.map(({ label, valid }) => (
+                    <div key={label} className={cx('flex items-center gap-2', valid ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-500 dark:text-slate-400')}>
+                      <span className={cx('h-3 w-3 rounded-full border', valid ? 'border-emerald-600 bg-emerald-600' : 'border-slate-400 bg-transparent')} />
+                      {label}
+                    </div>
+                  ))}
+                </div>
+              </div>
               <PasswordField label="Confirm Password" value={signupData.confirmPassword} show={showConfirmPass} setShow={setShowConfirmPass} onChange={(value) => setSignupData({ ...signupData, confirmPassword: value })} inputClass={inputClass} />
               <label className="flex items-start gap-2 text-sm">
                 <input type="checkbox" checked={agreeTOS} onChange={(event) => setAgreeTOS(event.target.checked)} required className="mt-1 h-4 w-4 accent-violet-700" />
@@ -218,9 +288,9 @@ export default function Auth() {
                   <button type="button" onClick={() => openPolicy('privacy')} className="font-bold text-violet-700 underline">Privacy Policy</button>
                 </span>
               </label>
-              <button type="submit" disabled={authLoading} className="inline-flex items-center justify-center gap-2 rounded-lg bg-violet-700 px-5 py-3 text-sm font-bold text-white transition hover:bg-violet-800 disabled:cursor-not-allowed disabled:opacity-70">
-                {authLoading ? <Loader2 size={18} className="animate-spin" /> : <UserPlus size={18} />}
-                {authLoading ? 'Creating Account...' : 'Create Account'}
+              <button type="submit" disabled={signupLoading} className="inline-flex items-center justify-center gap-2 rounded-lg bg-violet-700 px-5 py-3 text-sm font-bold text-white transition hover:bg-violet-800 disabled:cursor-not-allowed disabled:opacity-60">
+                <UserPlus size={18} />
+                {signupLoading ? 'Creating account...' : 'Create Account'}
               </button>
             </form>
           )}

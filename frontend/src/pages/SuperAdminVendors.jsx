@@ -12,7 +12,6 @@ export default function SuperAdminVendors() {
   const { theme } = useTheme()
   const isDark = theme === 'dark'
   const [search, setSearch] = useState('')
-  const [statusFilter, setStatusFilter] = useState('all')
   const [actioningId, setActioningId] = useState(null)
   const [rejectReason, setRejectReason] = useState('')
   const [showRejectModal, setShowRejectModal] = useState(null)
@@ -22,27 +21,15 @@ export default function SuperAdminVendors() {
   const vendors = data?.vendors || []
   const totalVendors = vendors.length
 
-  const statusCounts = useMemo(() => {
-    return vendors.reduce(
-      (counts, vendor) => {
-        counts[vendor.vendorStatus || 'pending'] = (counts[vendor.vendorStatus || 'pending'] || 0) + 1
-        return counts
-      },
-      { all: vendors.length, approved: 0, pending: 0, rejected: 0 },
-    )
-  }, [vendors])
-
   const filteredVendors = useMemo(() => {
-    const query = search.toLowerCase()
+    if (!search) return vendors
     return vendors.filter((vendor) => {
-      const matchesStatus = statusFilter === 'all' || vendor.vendorStatus === statusFilter
-      if (!matchesStatus) return false
-      if (!search) return true
+      const query = search.toLowerCase()
       return [vendor.brandName, vendor.name, vendor.email, vendor.accountHolderName, vendor.bankName, vendor.accountNumber, vendor.vendorStatus, vendor.phone]
         .filter(Boolean)
         .some((value) => value.toString().toLowerCase().includes(query))
     })
-  }, [search, vendors, statusFilter])
+  }, [search, vendors])
 
   const handleApprove = async (vendorId) => {
     try {
@@ -114,26 +101,6 @@ export default function SuperAdminVendors() {
             </div>
           </div>
 
-          <div className="mt-4 flex flex-wrap gap-2">
-            {['all', 'pending', 'approved', 'rejected'].map((status) => (
-              <button
-                key={status}
-                type="button"
-                onClick={() => setStatusFilter(status)}
-                className={cx(
-                  'rounded-full px-4 py-2 text-sm font-semibold transition',
-                  statusFilter === status
-                    ? 'bg-violet-700 text-white shadow-sm'
-                    : isDark
-                      ? 'border border-slate-700 bg-slate-950 text-slate-300 hover:bg-slate-900'
-                      : 'border border-slate-200 bg-white text-slate-700 hover:bg-slate-100',
-                )}
-              >
-                {status === 'all' ? 'All' : status.charAt(0).toUpperCase() + status.slice(1)} ({statusCounts[status] || 0})
-              </button>
-            ))}
-          </div>
-
           <div className="mt-6 overflow-x-auto rounded-3xl border border-slate-200 bg-transparent text-sm shadow-sm dark:border-slate-800">
             <table className="min-w-full table-auto text-left">
               <thead className={cx('border-b', isDark ? 'border-slate-700 bg-slate-950' : 'border-slate-200 bg-slate-50')}>
@@ -166,7 +133,7 @@ export default function SuperAdminVendors() {
                   </tr>
                 ) : (
                   filteredVendors.map((vendor) => (
-                    <tr key={vendor._id || vendor.id} className={cx(isDark ? 'bg-slate-900 hover:bg-slate-800' : 'bg-white hover:bg-slate-50', 'transition-colors')}>
+                    <tr key={vendor._id || vendor.id} className={isDark ? 'bg-slate-900' : 'bg-white'}>
                       <td className="px-4 py-4 font-semibold text-slate-900 dark:text-slate-100">{vendor.brandName || vendor.name || 'Unknown'}</td>
                       <td className={cx('px-4 py-4', isDark ? 'text-slate-300' : 'text-slate-600')}>{vendor.accountHolderName || vendor.ownerName || vendor.name || 'N/A'}</td>
                       <td className={cx('px-4 py-4', isDark ? 'text-slate-300' : 'text-slate-600')}>{vendor.email || 'N/A'}</td>

@@ -8,6 +8,7 @@ import { useTheme } from '../context/ThemeContext'
 import { useNotification } from '../hooks/useNotification'
 import { useAuth } from '../context/AuthContext'
 import { useLazyVerifyPaymentQuery } from '../redux/slices/orderApiSlice'
+import { useUpdateCartMutation } from '../redux/slices/cartFavoritesApiSlice'
 
 const NAV_LINKS = [
   { path: '/shop', label: 'Shop' },
@@ -29,6 +30,7 @@ export default function PaymentSuccess() {
   const [error, setError] = useState(null)
   const [order, setOrder] = useState(null)
   const [verifyPayment] = useLazyVerifyPaymentQuery()
+  const [updateCart] = useUpdateCartMutation()
   const pageClass = isDark ? 'bg-slate-950 text-slate-100' : 'bg-slate-50 text-slate-950'
   const surfaceClass = isDark ? 'border-white/10 bg-slate-900 text-slate-100 shadow-black/30' : 'border-slate-200 bg-white text-slate-950 shadow-slate-200/70'
   const mutedText = isDark ? 'text-slate-300' : 'text-slate-600'
@@ -44,8 +46,19 @@ export default function PaymentSuccess() {
     const verify = async () => {
       try {
         const response = await verifyPayment(reference).unwrap()
-        setOrder(response.order)
-        setStatus('Payment verified successfully!')
+        const verifiedOrder = response.order || response
+        setOrder(verifiedOrder)
+        if (response.order?.paymentStatus === 'paid') {
+          setStatus('Payment verified successfully!')
+          try {
+            await updateCart([]).unwrap()
+          } catch (e) {
+            // non-fatal
+          }
+        } else {
+          setError(response.message || 'Payment was not completed or was cancelled.')
+          setStatus(null)
+        }
       } catch (err) {
         setError(err.message || 'Payment verification failed. Please contact support.')
         setStatus(null)

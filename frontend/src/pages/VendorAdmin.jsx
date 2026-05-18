@@ -97,16 +97,17 @@ export default function VendorAdmin() {
   }, [isAuthenticated, user?.role])
 
   const stats = useMemo(() => {
-    const completedOrders = orders.filter((order) => order.status === 'delivered').length
+    const paidOrders = orders.filter((order) => order.paymentStatus === 'paid')
+    const completedOrders = paidOrders.filter((order) => order.status === 'delivered').length
     const pendingOrders = orders.filter((order) => order.status === 'pending').length
-    const totalRevenue = orders.reduce((sum, order) => sum + Number(order.totalAmount || order.total || 0), 0)
+    const totalRevenue = paidOrders.reduce((sum, order) => sum + Number(order.totalAmount || order.total || 0), 0)
     return [
       { label: 'Products live', value: products.length },
       { label: 'Orders', value: orders.length },
       { label: 'Pending', value: pendingOrders },
       { label: 'Revenue', value: showRevenue ? formatCurrency(totalRevenue) : '••••', detail: `${completedOrders} delivered`, hasToggle: true },
     ]
-  }, [orders, products])
+  }, [orders, products, showRevenue])
 
   const showTimedSuccess = (message) => {
     setSuccess(message)

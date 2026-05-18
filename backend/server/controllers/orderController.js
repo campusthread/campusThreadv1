@@ -194,35 +194,214 @@ export const initializePayment = async (req, res) => {
   });
 };
 
+export const initializePaymentWithOrder = async (req, res) => {
+  // Expect items and shippingAddress in body, but do not create DB order yet.
+  if (!Array.isArray(req.body.items) || req.body.items.length === 0) {
+    throw new AppError('Order must contain at least one item', 400);
+  }
+
+  const items = [];
+
+  for (const item of req.body.items) {
+    const productId = item.productId || item.product?._id || item.product || null;
+    const product = await Product.findById(productId).populate('vendor', 'brandName name');
+    if (!product) {
+      throw new AppError(`Product not found: ${productId}`, 404);
+    }
+
+    items.push({
+      product: product._id,
+      vendor: product.vendor._id,
+      quantity: item.quantity,
+      price: product.price,
+      name: product.name,
+    });
+  }
+
+  const totalAmount = items.reduce((sum, item) => sum + item.price * item.quantity, 0);
+  const reference = `pay_${uuid().replace(/-/g, '')}`;
+
+  // Build metadata to include minimal order payload and buyer id
+  const metadata = {
+    buyer: String(req.user._id),
+    items: items.map((it) => ({ product: String(it.product), quantity: it.quantity, price: it.price, name: it.name })),
+    shippingAddress: req.body.shippingAddress || {},
+    paymentMethod: req.body.paymentMethod || 'paystack',
+    totalAmount,
+  };
+
+  try {
+    const payload = {
+      email: req.body.email || req.user?.email,
+      amount: Math.round(totalAmount * 100),
+      reference,
+      callback_url: `${env.clientUrl}/payment-success?reference=${reference}`,
+      metadata,
+    };
+
+    const resp = await fetch('https://api.paystack.co/transaction/initialize', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${env.paystack.secretKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(payload),
+    });
+
+    const data = await resp.json();
+    if (data && data.status && data.data && data.data.authorization_url) {
+      sendSuccess(res, {
+        message: 'Payment initialized',
+        data: {
+          authorization_url: data.data.authorization_url,
+          reference,
+        },
+      });
+      return;
+    }
+    logger.warn('Paystack initialize did not return authorization_url', { response: data });
+  } catch (err) {
+    logger.error('Paystack initialization failed', { message: err?.message });
+  }
+
+  sendSuccess(res, {
+    message: 'Payment initialized',
+    data: {
+      authorization_url: `${env.clientUrl}/payment-success?reference=${reference}`,
+      reference,
+    },
+  });
+};
+
 export const verifyPayment = async (req, res) => {
   const { reference } = req.query;
   if (!reference) {
     throw new AppError("Payment reference is required", 400);
   }
 
-  const order = await populateOrderQuery(Order.findOne({ paymentReference: reference }));
-  if (!order) {
-    throw new AppError("Order not found for payment reference", 404);
-  }
+  let order = await populateOrderQuery(Order.findOne({ paymentReference: reference }));
+  // Verify transaction status with Paystack before marking as paid
+  try {
+    const resp = await fetch(`https://api.paystack.co/transaction/verify/${reference}`, {
+      method: 'GET',
+      headers: {
+        Authorization: `Bearer ${env.paystack.secretKey}`,
+        'Content-Type': 'application/json',
+      },
+    });
 
-  order.paymentStatus = "paid";
-  order.status = order.status === "pending" ? "processing" : order.status;
-  await order.save();
+    const data = await resp.json();
 
-  sendSuccess(res, {
-    message: "Payment verified",
-    data: { order },
-  });
-
-  (async () => {
-    try {
-      const buyer = await User.findById(order.buyer).select("name email");
-      if (buyer) {
-        await emailService.sendOrderStatusUpdateEmail(order, buyer);
-        logger.info("Sent payment verified email", { to: buyer.email, orderNumber: order.orderNumber });
-      }
-    } catch (err) {
-      logger.error("Payment verification email failed", { orderNumber: order.orderNumber, message: err?.message });
+    if (!data || !data.status || !data.data) {
+      // Unexpected Paystack response
+      logger.warn('Paystack verify returned unexpected response', { reference, response: data });
+      throw new AppError('Unable to verify payment at this time', 502);
     }
-  })();
+
+    const tx = data.data;
+
+    // If order does not exist yet, attempt to create it from Paystack metadata
+    if (!order) {
+      const meta = tx.metadata || {};
+      if (!meta || !meta.items || !Array.isArray(meta.items)) {
+        throw new AppError('Order not found and no metadata to create order', 404);
+      }
+
+      // Rebuild items and validate products
+      const items = [];
+      const vendorNotifications = new Map();
+      for (const it of meta.items) {
+        const product = await Product.findById(it.product).populate('vendor', 'brandName name email');
+        if (!product) throw new AppError(`Product not found: ${it.product}`, 404);
+        items.push({ product: product._id, vendor: product.vendor._id, quantity: it.quantity, price: product.price, name: product.name });
+
+        const vendorId = product.vendor._id.toString();
+        if (!vendorNotifications.has(vendorId)) vendorNotifications.set(vendorId, { vendor: product.vendor, items: [] });
+        vendorNotifications.get(vendorId).items.push({ name: product.name, quantity: it.quantity, price: product.price });
+      }
+
+      const totalAmountFromMeta = items.reduce((sum, item) => sum + item.price * item.quantity, 0);
+      const expectedAmount = Math.round(totalAmountFromMeta * 100);
+
+      if (!(tx.status === 'success' && Number(tx.amount) === Number(expectedAmount))) {
+        // Transaction not successful or amount mismatch
+        sendSuccess(res, { message: 'Payment not completed', data: { paystack: tx } });
+        return;
+      }
+
+      // Create the order now and mark as paid
+      order = await Order.create({
+        orderNumber: `CT-${uuid().slice(0, 8).toUpperCase()}`,
+        buyer: meta.buyer || req.user._id,
+        items,
+        shippingAddress: meta.shippingAddress || {},
+        paymentMethod: meta.paymentMethod || 'paystack',
+        totalAmount: totalAmountFromMeta,
+        paymentReference: reference,
+        paymentStatus: 'paid',
+        status: 'processing',
+      });
+
+      // Send notifications asynchronously
+      (async () => {
+        try {
+          const buyer = await User.findById(order.buyer).select('name email');
+          if (buyer) await emailService.sendBuyerOrderConfirmation(order, buyer);
+          await Promise.all(
+            Array.from(vendorNotifications.values()).map(({ vendor, items }) =>
+              emailService.sendVendorOrderNotification(vendor, order, items, buyer?.name || 'Buyer'),
+            ),
+          );
+        } catch (err) {
+          logger.error('Order creation notifications failed', { orderNumber: order.orderNumber, message: err?.message });
+        }
+      })();
+
+      // Populate for response
+      order = await populateOrderQuery(Order.findById(order._id));
+    }
+
+    // Ensure transaction was successful and amount matches order
+    const expectedAmount = Math.round((order.totalAmount || 0) * 100);
+    if (tx.status === 'success' && Number(tx.amount) === Number(expectedAmount)) {
+      if (order.paymentStatus === 'paid') {
+        // already marked
+      } else {
+        order.paymentStatus = 'paid';
+        order.status = order.status === 'pending' ? 'processing' : order.status;
+        await order.save();
+      }
+
+      sendSuccess(res, {
+        message: 'Payment verified',
+        data: { order, paystack: tx },
+      });
+
+      (async () => {
+        try {
+          const buyer = await User.findById(order.buyer).select('name email');
+          if (buyer) {
+            await emailService.sendOrderStatusUpdateEmail(order, buyer);
+            logger.info('Sent payment verified email', { to: buyer.email, orderNumber: order.orderNumber });
+          }
+        } catch (err) {
+          logger.error('Payment verification email failed', { orderNumber: order.orderNumber, message: err?.message });
+        }
+      })();
+      return;
+    }
+
+    // If payment not successful, mark as failed (but don't delete the order)
+    order.paymentStatus = 'failed';
+    await order.save();
+
+    sendSuccess(res, {
+      message: 'Payment not completed',
+      data: { order, paystack: tx },
+    });
+  } catch (err) {
+    if (err instanceof AppError) throw err;
+    logger.error('Payment verification error', { reference, message: err?.message });
+    throw new AppError('Payment verification failed', 500);
+  }
 };

@@ -148,6 +148,14 @@ class APIClient {
 const apiClient = new APIClient(API_URL);
 
 // ============================================
+// AUTH ENDPOINTS
+// ============================================
+export const authAPI = {
+  forgotPassword: (email) => apiClient.post('/auth/forgot-password', { email }),
+  resetPassword: (token, password) => apiClient.post('/auth/reset-password', { token, password }),
+}
+
+// ============================================
 // PRODUCT ENDPOINTS
 // ============================================
 export const productAPI = {

@@ -11,6 +11,7 @@ const buildDashboardStats = async () => {
   const totalVendors = await User.countDocuments({ role: "vendor" });
   const totalProducts = await Product.countDocuments();
   const totalOrders = await Order.countDocuments();
+  const totalPaidOrders = await Order.countDocuments({ paymentStatus: 'paid' });
 
   const thirtyDaysAgo = new Date();
   thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
@@ -21,12 +22,13 @@ const buildDashboardStats = async () => {
   const newUsers7d = await User.countDocuments({ createdAt: { $gte: sevenDaysAgo } });
 
   const orderRevenue = await Order.aggregate([
+    { $match: { paymentStatus: 'paid' } },
     { $unwind: "$items" },
     { $group: { _id: null, total: { $sum: { $multiply: ["$items.price", "$items.quantity"] } } } },
   ]);
 
   const totalRevenue = orderRevenue[0]?.total || 0;
-  const avgOrderValue = totalOrders > 0 ? totalRevenue / totalOrders : 0;
+  const avgOrderValue = totalPaidOrders > 0 ? totalRevenue / totalPaidOrders : 0;
 
   return {
     totalUsers,
@@ -233,6 +235,60 @@ export const getAllOrders = async (req, res) => {
     });
   } catch (error) {
     sendError(res, error.message, 500);
+  }
+};
+
+export const sendReminderEmails = async (req, res) => {
+  try {
+    const { audience = 'all', headline, message, ctaUrl } = req.body;
+    const normalizedAudience = audience.toLowerCase();
+
+    const allowedAudiences = ['vendors', 'customers', 'buyers', 'all'];
+    if (!allowedAudiences.includes(normalizedAudience)) {
+      throw new AppError('Invalid audience. Use vendors, customers, buyers, or all.', 400);
+    }
+
+    const filter = {};
+    if (normalizedAudience === 'vendors') {
+      filter.role = 'vendor';
+    } else if (normalizedAudience === 'customers' || normalizedAudience === 'buyers') {
+      filter.role = 'customer';
+    } else {
+      filter.role = { $in: ['customer', 'vendor'] };
+    }
+
+    const users = await User.find(filter).select('name email role brandName');
+
+    const results = await Promise.allSettled(
+      users.map((user) => {
+        if (user.role === 'vendor') {
+          return emailService.sendVendorUploadReminderEmail(user, {
+            headline,
+            message,
+            ctaUrl,
+          });
+        }
+
+        return emailService.sendBuyerPromotionEmail(user, {
+          headline,
+          message,
+          ctaUrl,
+        });
+      }),
+    );
+
+    const successCount = results.filter((result) => result.status === 'fulfilled').length;
+
+    sendSuccess(res, {
+      message: 'Reminder emails processed',
+      data: {
+        audience: normalizedAudience,
+        totalRecipients: users.length,
+        successCount,
+      },
+    });
+  } catch (error) {
+    sendError(res, error.message, error.statusCode || 500);
   }
 };
 

@@ -8,6 +8,7 @@ import {
   initializePayment,
   updateOrderStatus,
   verifyPayment,
+  initializePaymentWithOrder,
 } from "../controllers/orderController.js";
 import { requireAuth } from "../middleware/auth.middleware.js";
 import { requireRole } from "../middleware/role.middleware.js";
@@ -21,6 +22,7 @@ router.get("/payment/verify", verifyPayment);
 router.get("/:id", getOrderById);
 router.post("/", createOrder);
 router.post("/:id/initialize-payment", initializePayment);
+router.post("/initialize-payment-with-order", initializePaymentWithOrder);
 router.put("/:id/status", requireRole("vendor"), updateOrderStatus);
 
 export default router;

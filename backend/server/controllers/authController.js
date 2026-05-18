@@ -1,4 +1,4 @@
-import { authService, getAuthCookieOptions } from "../services/authService.js";
+import { authService, getAuthCookieOptions, isAdminRegistrationAllowed } from "../services/authService.js";
 import { sendSuccess } from "../utils/response.js";
 import { AppError } from "../utils/errors.js";
 import * as emailService from "../services/emailService.js";
@@ -29,6 +29,16 @@ export const getCurrentUser = async (req, res) => {
   sendSuccess(res, { data: { user: authService.sanitizeUser(req.user) } });
 };
 
+export const forgotPassword = async (req, res) => {
+  await authService.forgotPassword(req.body);
+  sendSuccess(res, { message: 'If that email exists, a reset link has been sent.' });
+};
+
+export const resetPassword = async (req, res) => {
+  const result = await authService.resetPassword(req.body);
+  sendSuccess(res, { message: 'Password has been reset successfully.', data: result });
+};
+
 export const logout = async (req, res) => {
   res.clearCookie("accessToken", getAuthCookieOptions());
   sendSuccess(res, { message: "Logout successful" });
@@ -48,4 +58,9 @@ export const refresh = async (req, res) => {
   const result = await authService.refresh(token);
   res.cookie("accessToken", result.token, getAuthCookieOptions());
   sendSuccess(res, { message: "Token refreshed", data: result });
+};
+
+export const getRegistrationStatus = async (req, res) => {
+  const adminAllowed = await isAdminRegistrationAllowed();
+  sendSuccess(res, { data: { adminAllowed, adminExists: !adminAllowed } });
 };

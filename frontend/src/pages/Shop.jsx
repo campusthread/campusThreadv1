@@ -1,12 +1,10 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Link, useLocation, useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import {
   Building2,
   Grid2X2,
   Heart,
   Inbox,
-  Menu,
-  Moon,
   Package,
   RotateCcw,
   Search,
@@ -14,10 +12,9 @@ import {
   ShoppingCart,
   SlidersHorizontal,
   Store,
-  Sun,
   User,
-  X,
 } from 'lucide-react'
+import Navbar from '../components/Navbar'
 import NotificationToast from '../components/NotificationToast'
 import SectionLoader from '../components/SectionLoader'
 import { useTheme } from '../context/ThemeContext'
@@ -45,11 +42,9 @@ const cx = (...classes) => classes.filter(Boolean).join(' ')
 
 export default function Shop() {
   const navigate = useNavigate()
-  const location = useLocation()
-  const { theme, toggleTheme } = useTheme()
+  const { theme } = useTheme()
   const isDark = theme === 'dark'
   const { notifications } = useNotification()
-  const [menuOpen, setMenuOpen] = useState(false)
 
   // Fetch from API instead of localStorage
   const { data: productsData = [], error: productsError, isFetching: productsFetching } = useGetProductsQuery({ limit: 50 })
@@ -89,15 +84,6 @@ export default function Shop() {
       ? 'border-white/10 bg-slate-950 text-slate-100 placeholder:text-slate-500'
       : 'border-slate-200 bg-white text-slate-950 placeholder:text-slate-400',
   )
-  const navLinkClass = (path) =>
-    cx(
-      'rounded-md px-3 py-2 text-sm font-semibold transition',
-      location.pathname === path
-        ? 'bg-violet-700 text-white'
-        : isDark
-          ? 'text-slate-200 hover:bg-violet-400/10 hover:text-violet-200'
-          : 'text-slate-700 hover:bg-violet-100 hover:text-violet-700',
-    )
 
   const stats = useMemo(() => {
     const universities = new Set(allProducts.map((product) => product.university).filter(Boolean)).size
@@ -177,55 +163,7 @@ export default function Shop() {
   return (
     <div className={cx('min-h-screen transition-colors duration-300', pageClass)}>
       <NotificationToast notifications={notifications} />
-      <header className={cx('sticky top-0 z-50 border-b backdrop-blur-xl', isDark ? 'border-white/10 bg-slate-950/90' : 'border-slate-200 bg-white/90')}>
-        <nav className="mx-auto flex min-h-16 max-w-7xl items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
-          <Link to="/" className="text-xl font-black uppercase tracking-normal text-violet-700">
-            Campus<span className={isDark ? 'text-slate-100' : 'text-slate-950'}>Thread</span>
-          </Link>
-
-          <div className="hidden items-center gap-1 md:flex">
-            {navLinks.map((link) => (
-              <Link key={link.path} to={link.path} className={navLinkClass(link.path)}>
-                {link.label}
-              </Link>
-            ))}
-          </div>
-
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={toggleTheme}
-              className={cx('inline-flex h-10 w-10 items-center justify-center rounded-lg transition', isDark ? 'bg-slate-800 text-amber-200 hover:bg-slate-700' : 'bg-slate-100 text-slate-700 hover:bg-violet-100')}
-              title="Toggle Dark Mode"
-              aria-label="Toggle Dark Mode"
-            >
-              {isDark ? <Sun size={18} /> : <Moon size={18} />}
-            </button>
-
-            <button
-              type="button"
-              className={cx('inline-flex h-10 w-10 items-center justify-center rounded-lg md:hidden', isDark ? 'bg-slate-800 text-slate-100' : 'bg-slate-100 text-slate-900')}
-              onClick={() => setMenuOpen((open) => !open)}
-              aria-label="Toggle navigation menu"
-              aria-expanded={menuOpen}
-            >
-              {menuOpen ? <X size={20} /> : <Menu size={20} />}
-            </button>
-          </div>
-        </nav>
-
-        {menuOpen && (
-          <div className={cx('border-t px-4 py-3 md:hidden', isDark ? 'border-white/10 bg-slate-950' : 'border-slate-200 bg-white')}>
-            <div className="mx-auto grid max-w-7xl gap-1">
-              {navLinks.map((link) => (
-                <Link key={link.path} to={link.path} className={cx(navLinkClass(link.path), 'block px-4 py-3 text-base')} onClick={() => setMenuOpen(false)}>
-                  {link.label}
-                </Link>
-              ))}
-            </div>
-          </div>
-        )}
-      </header>
+      <Navbar links={navLinks} />
 
       <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
         <section className="grid gap-8 border-b border-slate-200/70 pb-8 dark:border-white/10 lg:grid-cols-[1.3fr_0.7fr]">
@@ -387,15 +325,17 @@ function ProductCard({ product, isDark, surfaceClass, mutedText, onView }) {
   return (
     <article className={cx('group flex overflow-hidden rounded-xl border shadow-lg transition hover:-translate-y-1 hover:shadow-xl', surfaceClass)}>
       <div className="flex w-full flex-col">
-        <div className={cx('flex h-48 items-center justify-center overflow-hidden', isDark ? 'bg-slate-950' : 'bg-slate-100')}>
+        <div className={cx('relative h-48 md:h-56 lg:h-64 w-full overflow-hidden', isDark ? 'bg-slate-950' : 'bg-slate-100')}>
           {videoUrl ? (
-            <video className="h-full w-full object-contain" controls>
+            <video className="h-full w-full object-cover" controls>
               <source src={videoUrl} />
             </video>
           ) : imageUrl ? (
-            <img src={imageUrl} className="h-full w-full object-contain transition duration-300 group-hover:scale-105" alt={product.name} />
+            <img src={imageUrl} className="h-full w-full object-cover transition duration-300 group-hover:scale-105" alt={product.name} />
           ) : (
-            <Package size={42} className={isDark ? 'text-slate-600' : 'text-slate-400'} />
+            <div className="flex items-center justify-center h-full w-full">
+              <Package size={42} className={isDark ? 'text-slate-600' : 'text-slate-400'} />
+            </div>
           )}
         </div>
 

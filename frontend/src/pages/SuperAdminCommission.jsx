@@ -85,8 +85,10 @@ export default function SuperAdminCommission() {
         })
     }, [orders, filter])
 
+    const paidOrders = useMemo(() => filteredOrders.filter((order) => order.paymentStatus === 'paid'), [filteredOrders])
+
     const commissionBreakdown = useMemo(() => {
-        const breakdown = filteredOrders.map((order) => {
+        const breakdown = paidOrders.map((order) => {
             const orderTotal = Number(order.totalAmount || order.total || 0)
             const commissionAmount = orderTotal * COMMISSION_RATE
             return {
@@ -96,11 +98,11 @@ export default function SuperAdminCommission() {
             }
         })
         return breakdown
-    }, [filteredOrders])
+    }, [paidOrders])
 
     const totalRevenue = commissionBreakdown.reduce((sum, item) => sum + item.commissionAmount, 0)
     const totalPlatformRevenue = commissionBreakdown.reduce((sum, item) => sum + item.orderTotal, 0)
-    const orderCount = commissionBreakdown.length
+    const orderCount = paidOrders.length
 
     return (
         <div className="min-h-screen bg-slate-50 text-slate-950 dark:bg-slate-950 dark:text-slate-100">

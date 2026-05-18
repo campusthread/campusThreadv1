@@ -5,6 +5,7 @@ import { env } from "./config/env.js";
 import { connectToDatabase, disconnectFromDatabase } from "./config/db.js";
 import { connectRedis, disconnectRedis } from "./config/redis.js";
 import { setupSocketServer } from "./config/socket.js";
+import { startReminderScheduler } from "./services/reminderService.js";
 import { logger } from "./utils/logger.js";
 
 const server = http.createServer(app);
@@ -28,6 +29,8 @@ const shutdown = async (signal) => {
 const start = async () => {
   await connectToDatabase();
   await connectRedis();
+
+  startReminderScheduler({ intervalDays: 3 });
 
   server.listen(env.port, () => {
     logger.info("API server listening", {

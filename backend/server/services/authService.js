@@ -1,9 +1,11 @@
+import crypto from "crypto";
 import jwt from "jsonwebtoken";
 import { z } from "zod";
 
 import User from "../models/User.js";
 import { env } from "../config/env.js";
 import { AppError } from "../utils/errors.js";
+import { sendPasswordResetEmail, sendPasswordResetConfirmation } from "../services/emailService.js";
 
 export const registerSchema = z.object({
   name: z.string().min(2),
@@ -40,10 +42,27 @@ export const loginSchema = z.object({
   password: z.string().min(6),
 });
 
+export const forgotPasswordSchema = z.object({
+  email: z.string().email(),
+});
+
+export const resetPasswordSchema = z.object({
+  token: z.string().min(1),
+  password: z.string().min(6),
+});
+
+const hashToken = (token) =>
+  crypto.createHash('sha256').update(token).digest('hex');
+
 const signToken = (user) =>
   jwt.sign({ sub: user._id.toString(), role: user.role }, env.jwtSecret, {
     expiresIn: env.jwtExpiresIn,
   });
+
+export const isAdminRegistrationAllowed = async () => {
+  const adminExists = await User.exists({ role: 'admin' });
+  return !adminExists;
+};
 
 const sanitizeUser = (user) => ({
   _id: user._id,
@@ -74,6 +93,13 @@ export const getAuthCookieOptions = () => ({
 export const authService = {
   async register(payload) {
     const input = registerSchema.parse(payload);
+
+    if (input.role === 'admin') {
+      const adminAllowed = await isAdminRegistrationAllowed();
+      if (!adminAllowed) {
+        throw new AppError('Only one super admin account is allowed', 409);
+      }
+    }
 
     const existingUser = await User.findOne({ email: input.email });
     if (existingUser) {
@@ -106,6 +132,48 @@ export const authService = {
 
     return {
       token,
+      user: sanitizeUser(user),
+    };
+  },
+
+  async forgotPassword(payload) {
+    const { email } = forgotPasswordSchema.parse(payload);
+    const user = await User.findOne({ email });
+    if (!user) {
+      return { message: 'If that email exists, a reset link has been sent.' };
+    }
+
+    const resetToken = crypto.randomBytes(32).toString('hex');
+    user.passwordResetToken = hashToken(resetToken);
+    user.passwordResetExpires = Date.now() + 60 * 60 * 1000;
+    await user.save({ validateBeforeSave: false });
+
+    const resetUrl = `${env.frontendUrl || env.clientUrl || 'http://localhost:5173'}/reset-password?token=${resetToken}`;
+    await sendPasswordResetEmail(user, resetUrl);
+
+    return { message: 'If that email exists, a reset link has been sent.' };
+  },
+
+  async resetPassword(payload) {
+    const { token, password } = resetPasswordSchema.parse(payload);
+    const hashedToken = hashToken(token);
+    const user = await User.findOne({
+      passwordResetToken: hashedToken,
+      passwordResetExpires: { $gt: Date.now() },
+    }).select('+password');
+
+    if (!user) {
+      throw new AppError('Invalid or expired reset token', 400);
+    }
+
+    user.password = password;
+    user.passwordResetToken = undefined;
+    user.passwordResetExpires = undefined;
+    await user.save();
+
+    await sendPasswordResetConfirmation(user);
+
+    return {
       user: sanitizeUser(user),
     };
   },
