@@ -24,6 +24,7 @@ import SuperAdminCommission from './pages/SuperAdminCommission'
 import SuperAdminVendors from './pages/SuperAdminVendors'
 import SuperAdminLogin from './pages/SuperAdminLogin'
 import SuperAdminRegister from './pages/SuperAdminRegister'
+import HealthCheck from './pages/HealthCheck'
 
 // Protected route component
 function ProtectedRoute({ children, requiredRole }) {
@@ -50,6 +51,7 @@ const router = createBrowserRouter(
     { path: '/auth', element: <Auth /> },
     { path: '/shop', element: <Shop /> },
     { path: '/explore', element: <Explore /> },
+    { path: '/health-check', element: <HealthCheck /> },
     { path: '/forgot-password', element: <ForgotPassword /> },
     { path: '/reset-password', element: <ResetPassword /> },
     { path: '/reset-success', element: <ResetSuccess /> },

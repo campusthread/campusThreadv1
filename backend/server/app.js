@@ -48,6 +48,17 @@ app.get("/health", (req, res) => {
   });
 });
 
+app.get('/api/health', (req, res) => {
+  sendSuccess(res, {
+    message: 'Backend is healthy',
+    data: {
+      env: env.nodeEnv,
+      clientUrl: env.clientUrl,
+      timestamp: new Date().toISOString(),
+    },
+  })
+})
+
 app.use("/api", apiLimiter);
 app.use("/api/auth", authRoutes);
 app.use("/api/users", usersRoutes);

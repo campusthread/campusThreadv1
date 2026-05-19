@@ -208,4 +208,8 @@ export const orderAPI = {
   verifyPayment: (reference) => apiClient.get(`/orders/payment/verify?reference=${reference}`),
 };
 
+export const healthAPI = {
+  check: () => apiClient.get('/health'),
+}
+
 export default apiClient;
