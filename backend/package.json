@@ -36,7 +36,9 @@
     "lucide-react": "^1.14.0",
     "mongodb": "^7.2.0",
     "mongoose": "^8.0.0",
+    "morgan": "^1.10.1",
     "multer": "^2.0.2",
+    "nodemailer": "^8.0.5",
     "redis": "^5.12.1",
     "socket.io": "^4.8.3",
     "streamifier": "^0.1.1",
@@ -45,8 +47,6 @@
   },
   "devDependencies": {
     "@types/compression": "^1.8.1",
-    "morgan": "^1.10.1",
-    "nodemailer": "^8.0.5",
     "nodemon": "^3.0.2"
   }
 }
