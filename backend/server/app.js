@@ -74,6 +74,16 @@ app.get('/api/health', (req, res) => {
   })
 })
 
+app.get('/api', (req, res) => {
+  sendSuccess(res, {
+    message: 'API root is available',
+    data: {
+      env: env.nodeEnv,
+      timestamp: new Date().toISOString(),
+    },
+  });
+});
+
 app.use("/api", apiLimiter);
 app.use("/api/auth", authRoutes);
 app.use("/api/users", usersRoutes);
