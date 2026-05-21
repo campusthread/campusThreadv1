@@ -69,7 +69,12 @@ export default function Checkout() {
     }))
 
     try {
-      const payment = await initializePaymentWithOrder({ items, shippingAddress: shipping, paymentMethod: 'paystack' }).unwrap()
+      const payment = await initializePaymentWithOrder({
+        items,
+        shippingAddress: shipping,
+        paymentMethod: 'paystack',
+        callback_url: window.location.origin,
+      }).unwrap()
       const authorizationUrl = payment.authorization_url || payment.data?.authorization_url
       if (authorizationUrl) {
         setOrderSuccess('Redirecting to payment...')
