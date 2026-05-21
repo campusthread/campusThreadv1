@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Building2, Inbox, Package, Store, University } from 'lucide-react'
+import Carousel from '../components/Carousel'
 import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
 import SectionLoader from '../components/SectionLoader'
@@ -135,8 +136,9 @@ export default function Explore() {
 }
 
 function ProductCard({ product, isDark, surfaceClass, mutedText, onView }) {
-  const media = product.images?.[0]?.url || product.media
+  const imageSlides = product.images?.length ? product.images.slice(0, 4) : []
   const video = product.videos?.[0]?.url || (product.mediaType?.startsWith('video/') ? product.media : '')
+  const fallbackImage = product.images?.[0]?.url || product.media
 
   return (
     <article className={cx('group overflow-hidden rounded-xl border shadow-lg transition hover:-translate-y-1 hover:shadow-xl', surfaceClass)}>
@@ -145,8 +147,10 @@ function ProductCard({ product, isDark, surfaceClass, mutedText, onView }) {
           <video className="h-full w-full object-cover" controls>
             <source src={video} />
           </video>
-        ) : media ? (
-          <img src={media} className="h-full w-full object-cover transition duration-300 group-hover:scale-105" alt={product.name} />
+        ) : imageSlides.length > 1 ? (
+          <Carousel images={imageSlides} interval={3000} className="h-full w-full" />
+        ) : fallbackImage ? (
+          <img src={fallbackImage} className="h-full w-full object-cover transition duration-300 group-hover:scale-105" alt={product.name} />
         ) : (
           <div className="flex items-center justify-center h-full w-full">
             <Package size={40} className={isDark ? 'text-slate-600' : 'text-slate-400'} />

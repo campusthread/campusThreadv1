@@ -3,9 +3,9 @@
  * Handles all HTTP requests to the backend
  */
 
-const rawApiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+const rawApiUrl = import.meta.env.VITE_API_URL || '';
 const normalizedApiUrl = rawApiUrl.replace(/\/+$/, '');
-const API_URL = normalizedApiUrl.endsWith('/api') ? normalizedApiUrl : `${normalizedApiUrl}/api`;
+const API_URL = normalizedApiUrl ? (normalizedApiUrl.endsWith('/api') ? normalizedApiUrl : `${normalizedApiUrl}/api`) : '/api';
 
 class APIClient {
   constructor(baseURL) {
@@ -84,9 +84,14 @@ class APIClient {
     return this.request(endpoint, { ...options, method: 'DELETE' });
   }
 
-  async uploadFile(endpoint, file, additionalData = {}) {
+  async uploadFile(endpoint, files, additionalData = {}) {
     const formData = new FormData();
-    formData.append('media', file);
+
+    if (Array.isArray(files)) {
+      files.forEach((file) => formData.append('media', file));
+    } else {
+      formData.append('media', files);
+    }
 
     for (const [key, value] of Object.entries(additionalData)) {
       formData.append(key, value);

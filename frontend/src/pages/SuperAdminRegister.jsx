@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { Moon, ShieldCheck, Sun, UserPlus } from 'lucide-react'
 import { useTheme } from '../context/ThemeContext'
@@ -15,8 +15,6 @@ export default function SuperAdminRegister() {
   const [terms, setTerms] = useState(false)
   const [alert, setAlert] = useState(null)
   const [isLoading, setIsLoading] = useState(false)
-  const [adminAllowed, setAdminAllowed] = useState(true)
-  const [statusLoading, setStatusLoading] = useState(true)
   const [strength, setStrength] = useState({ width: '0%', label: 'Weak', color: 'bg-red-600' })
   const pageClass = isDark ? 'bg-slate-950 text-slate-100' : 'bg-slate-50 text-slate-950'
   const surfaceClass = isDark ? 'border-white/10 bg-slate-900 text-slate-100 shadow-black/30' : 'border-slate-200 bg-white text-slate-950 shadow-slate-200/70'
@@ -43,32 +41,8 @@ export default function SuperAdminRegister() {
     setTimeout(() => setAlert(null), 5000)
   }
 
-  useEffect(() => {
-    const fetchAdminStatus = async () => {
-      try {
-        const response = await fetch('/api/auth/register-status', {
-          credentials: 'include',
-        })
-        const data = await response.json()
-        if (response.ok) {
-          setAdminAllowed(data.data.adminAllowed)
-        }
-      } catch (err) {
-        console.error('Failed to check super admin status', err)
-      } finally {
-        setStatusLoading(false)
-      }
-    }
-
-    fetchAdminStatus()
-  }, [])
-
   const handleSubmit = async (event) => {
     event.preventDefault()
-    if (!adminAllowed) {
-      return showAlert('A super admin account already exists. Please sign in instead.', 'error')
-    }
-
     const { name, email, phone, university, department, password, confirmPassword } = form
     if (!name || !email || !phone || !university || !department || !password || !confirmPassword) return showAlert('Please fill in all fields', 'error')
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return showAlert('Please enter a valid email address', 'error')
@@ -125,24 +99,16 @@ export default function SuperAdminRegister() {
 
         {alert && <div className={cx('mt-5 rounded-xl border px-4 py-3 text-sm font-semibold', alert.type === 'error' ? 'border-red-200 bg-red-50 text-red-700' : 'border-emerald-200 bg-emerald-50 text-emerald-700')}>{alert.msg}</div>}
 
-        {statusLoading ? (
-          <div className={cx('mt-5 rounded-xl border px-4 py-3 text-sm font-semibold', isDark ? 'border-slate-700 bg-slate-900 text-slate-200' : 'border-slate-200 bg-slate-50 text-slate-700')}>Checking super admin availability…</div>
-        ) : !adminAllowed ? (
-          <div className={cx('mt-5 rounded-xl border px-4 py-3 text-sm font-semibold', isDark ? 'border-amber-300/20 bg-amber-300/10 text-amber-100' : 'border-amber-200 bg-amber-50 text-amber-800')}>
-            A super admin account already exists. Registration is disabled. Please <Link to="/super-admin-login" className="font-bold text-violet-700">sign in</Link>.
-          </div>
-        ) : null}
-
         <form onSubmit={handleSubmit} className="mt-6 grid gap-5">
-          <Field label="Full Name"><input value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} required disabled={isLoading || statusLoading || !adminAllowed} className={inputClass} /></Field>
+          <Field label="Full Name"><input value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} required disabled={isLoading} className={inputClass} /></Field>
           <div className="grid gap-5 sm:grid-cols-2">
-            <Field label="Email Address"><input type="email" value={form.email} onChange={(event) => setForm({ ...form, email: event.target.value })} required disabled={isLoading || statusLoading || !adminAllowed} className={inputClass} /></Field>
-            <Field label="Phone Number"><input type="tel" value={form.phone} onChange={(event) => setForm({ ...form, phone: event.target.value })} required disabled={isLoading || statusLoading || !adminAllowed} className={inputClass} /></Field>
+            <Field label="Email Address"><input type="email" value={form.email} onChange={(event) => setForm({ ...form, email: event.target.value })} required disabled={isLoading} className={inputClass} /></Field>
+            <Field label="Phone Number"><input type="tel" value={form.phone} onChange={(event) => setForm({ ...form, phone: event.target.value })} required disabled={isLoading} className={inputClass} /></Field>
           </div>
           <div className="grid gap-5 sm:grid-cols-2">
-            <Field label="University"><input value={form.university} onChange={(event) => setForm({ ...form, university: event.target.value })} required disabled={isLoading || statusLoading || !adminAllowed} className={inputClass} /></Field>
+            <Field label="University"><input value={form.university} onChange={(event) => setForm({ ...form, university: event.target.value })} required disabled={isLoading} className={inputClass} /></Field>
             <Field label="Department">
-              <select value={form.department} onChange={(event) => setForm({ ...form, department: event.target.value })} required disabled={isLoading || statusLoading || !adminAllowed} className={inputClass}>
+              <select value={form.department} onChange={(event) => setForm({ ...form, department: event.target.value })} required disabled={isLoading} className={inputClass}>
                 <option value="">Select a department</option>
                 {[['admin', 'Administration'], ['finance', 'Finance'], ['academic', 'Academic'], ['student-affairs', 'Student Affairs'], ['it', 'IT Support'], ['other', 'Other']].map(([value, label]) => (
                   <option key={value} value={value}>{label}</option>
@@ -151,15 +117,15 @@ export default function SuperAdminRegister() {
             </Field>
           </div>
           <Field label="Password">
-            <input type="password" value={form.password} onChange={(event) => { setForm({ ...form, password: event.target.value }); calcStrength(event.target.value) }} required disabled={isLoading || statusLoading || !adminAllowed} className={inputClass} />
+            <input type="password" value={form.password} onChange={(event) => { setForm({ ...form, password: event.target.value }); calcStrength(event.target.value) }} required disabled={isLoading} className={inputClass} />
             <div className="mt-3 h-1 overflow-hidden rounded bg-slate-200">
               <div className={`h-full ${strength.widthClass || 'w-0'} ${strength.color}`} />
             </div>
             <p className="mt-2 text-sm">Password strength: <strong>{strength.label}</strong></p>
           </Field>
-          <Field label="Confirm Password"><input type="password" value={form.confirmPassword} onChange={(event) => setForm({ ...form, confirmPassword: event.target.value })} required disabled={isLoading || statusLoading || !adminAllowed} className={inputClass} /></Field>
+          <Field label="Confirm Password"><input type="password" value={form.confirmPassword} onChange={(event) => setForm({ ...form, confirmPassword: event.target.value })} required disabled={isLoading} className={inputClass} /></Field>
           <label className={cx('flex items-start gap-2 rounded-xl border p-4 text-sm', isDark ? 'border-white/10 bg-slate-950' : 'border-slate-200 bg-slate-50')}>
-            <input type="checkbox" checked={terms} onChange={(event) => setTerms(event.target.checked)} required disabled={isLoading || statusLoading || !adminAllowed} className="mt-1 h-4 w-4 accent-violet-700" />
+            <input type="checkbox" checked={terms} onChange={(event) => setTerms(event.target.checked)} required disabled={isLoading} className="mt-1 h-4 w-4 accent-violet-700" />
             <span>
               I agree to the{' '}
               <button type="button" onClick={() => openPolicy('terms')} className="font-bold text-violet-700 underline">Terms and Conditions</button>
@@ -167,7 +133,7 @@ export default function SuperAdminRegister() {
               <button type="button" onClick={() => openPolicy('privacy')} className="font-bold text-violet-700 underline">Privacy Policy</button>
             </span>
           </label>
-          <button type="submit" disabled={isLoading || statusLoading || !adminAllowed} className="inline-flex items-center justify-center gap-2 rounded-lg bg-violet-700 px-5 py-3 text-sm font-bold text-white transition hover:bg-violet-800 disabled:opacity-50 disabled:cursor-not-allowed">
+          <button type="submit" disabled={isLoading} className="inline-flex items-center justify-center gap-2 rounded-lg bg-violet-700 px-5 py-3 text-sm font-bold text-white transition hover:bg-violet-800 disabled:opacity-50 disabled:cursor-not-allowed">
             <UserPlus size={18} />
             {isLoading ? 'Creating Account...' : 'Create Account'}
           </button>

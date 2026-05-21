@@ -120,30 +120,44 @@ export const uploadProductMedia = async (req, res) => {
     throw new AppError("Product not found", 404);
   }
 
-  if (!req.file) {
+  const files = req.files && req.files.length ? req.files : req.file ? [req.file] : [];
+  if (!files.length) {
     throw new AppError("No file uploaded", 400);
   }
 
-  const isVideo = req.file.mimetype.startsWith("video/");
-  const uploadResult = await uploadBufferToCloudinary({
-    buffer: req.file.buffer,
-    folder: "campusthread/products/media",
-    publicId: `product-media-${product._id}-${uuid()}`,
-    resourceType: isVideo ? "video" : "image",
-  });
-  const media = { url: uploadResult.url, publicId: uploadResult.publicId };
+  if (files.length > 4) {
+    throw new AppError("You can upload up to 4 media files at once", 400);
+  }
 
-  if (isVideo) {
-    product.videos.push(media);
-  } else {
-    product.images.push(media);
+  if (product.images.length + files.filter((file) => !file.mimetype.startsWith("video/")).length > 4) {
+    throw new AppError("You can only upload up to 4 images per product", 400);
+  }
+
+  const uploadedMedia = [];
+  for (const file of files) {
+    const isVideo = file.mimetype.startsWith("video/");
+    const uploadResult = await uploadBufferToCloudinary({
+      buffer: file.buffer,
+      folder: "campusthread/products/media",
+      publicId: `product-media-${product._id}-${uuid()}`,
+      resourceType: isVideo ? "video" : "image",
+    });
+
+    const media = { url: uploadResult.url, publicId: uploadResult.publicId };
+    uploadedMedia.push(media);
+
+    if (isVideo) {
+      product.videos.push(media);
+    } else {
+      product.images.push(media);
+    }
   }
 
   await product.save();
 
   sendSuccess(res, {
     message: "Product media uploaded",
-    data: { url: uploadResult.url, publicId: uploadResult.publicId, product },
+    data: { media: uploadedMedia, product },
   });
 };
 

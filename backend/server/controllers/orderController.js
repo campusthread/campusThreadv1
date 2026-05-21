@@ -94,7 +94,7 @@ export const getOrderById = async (req, res) => {
 
 export const getUserOrders = async (req, res) => {
   const orders = await populateOrderQuery(
-    Order.find({ buyer: req.user._id }).sort({ createdAt: -1 }),
+    Order.find({ buyer: req.user._id, paymentStatus: 'paid' }).sort({ createdAt: -1 }),
   );
 
   sendSuccess(res, {
@@ -104,7 +104,7 @@ export const getUserOrders = async (req, res) => {
 
 export const getVendorOrders = async (req, res) => {
   const orders = await populateOrderQuery(
-    Order.find({ "items.vendor": req.user._id }).sort({ createdAt: -1 }),
+    Order.find({ "items.vendor": req.user._id, paymentStatus: 'paid' }).sort({ createdAt: -1 }),
   );
 
   sendSuccess(res, {
@@ -221,6 +221,11 @@ export const initializePaymentWithOrder = async (req, res) => {
   const totalAmount = items.reduce((sum, item) => sum + item.price * item.quantity, 0);
   const reference = `pay_${uuid().replace(/-/g, '')}`;
 
+  // Do NOT create a persistent pending order here. The order will be
+  // created by `verifyPayment` only after Paystack confirms a successful
+  // transaction. This avoids dashboard counts increasing for cancelled
+  // or abandoned payments.
+
   // Build metadata to include minimal order payload and buyer id
   const metadata = {
     buyer: String(req.user._id),
@@ -274,10 +279,19 @@ export const initializePaymentWithOrder = async (req, res) => {
 };
 
 export const verifyPayment = async (req, res) => {
-  const { reference } = req.query;
+  const reference =
+    req.query.reference ||
+    req.query.trxref ||
+    req.query.tx_ref ||
+    req.query.txref ||
+    req.query.ref ||
+    req.query.transaction_id
+
   if (!reference) {
     throw new AppError("Payment reference is required", 400);
   }
+
+  logger.info('Payment verification initiated', { reference });
 
   let order = await populateOrderQuery(Order.findOne({ paymentReference: reference }));
   // Verify transaction status with Paystack before marking as paid
@@ -302,9 +316,11 @@ export const verifyPayment = async (req, res) => {
 
     // If order does not exist yet, attempt to create it from Paystack metadata
     if (!order) {
+      logger.info('Order not found in database, attempting to create from Paystack metadata', { reference });
       const meta = tx.metadata || {};
-      if (!meta || !meta.items || !Array.isArray(meta.items)) {
-        throw new AppError('Order not found and no metadata to create order', 404);
+      if (!meta || !meta.items || !Array.isArray(meta.items) || !meta.buyer) {
+        logger.error('Invalid metadata for order creation', { reference, hasMeta: !!meta, hasItemsArray: Array.isArray(meta?.items), hasBuyer: !!meta?.buyer });
+        throw new AppError('Order not found and no valid metadata to create order', 404);
       }
 
       // Rebuild items and validate products
@@ -330,9 +346,17 @@ export const verifyPayment = async (req, res) => {
       }
 
       // Create the order now and mark as paid
+      const buyerId = meta.buyer || (req.user && req.user._id);
+      if (!buyerId) {
+        logger.error('Cannot create order - no buyer ID available', { reference, hasMeta: !!meta, hasReqUser: !!req.user });
+        throw new AppError('Unable to identify buyer for order', 400);
+      }
+
+      logger.info('Creating order from Paystack metadata', { reference, buyerId, itemCount: items.length });
+
       order = await Order.create({
         orderNumber: `CT-${uuid().slice(0, 8).toUpperCase()}`,
-        buyer: meta.buyer || req.user._id,
+        buyer: buyerId,
         items,
         shippingAddress: meta.shippingAddress || {},
         paymentMethod: meta.paymentMethod || 'paystack',
@@ -341,6 +365,8 @@ export const verifyPayment = async (req, res) => {
         paymentStatus: 'paid',
         status: 'processing',
       });
+
+      logger.info('Order created from metadata successfully', { orderNumber: order.orderNumber, orderId: order._id, reference });
 
       // Send notifications asynchronously
       (async () => {
@@ -365,11 +391,12 @@ export const verifyPayment = async (req, res) => {
     const expectedAmount = Math.round((order.totalAmount || 0) * 100);
     if (tx.status === 'success' && Number(tx.amount) === Number(expectedAmount)) {
       if (order.paymentStatus === 'paid') {
-        // already marked
+        logger.info('Payment already marked as paid', { reference, orderNumber: order.orderNumber });
       } else {
         order.paymentStatus = 'paid';
         order.status = order.status === 'pending' ? 'processing' : order.status;
         await order.save();
+        logger.info('Payment marked as paid', { reference, orderNumber: order.orderNumber });
       }
 
       sendSuccess(res, {

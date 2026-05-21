@@ -15,10 +15,13 @@ import { requireRole } from "../middleware/role.middleware.js";
 
 const router = Router();
 
+// Verify payment endpoint - no auth required (secured by Paystack reference token)
+router.get("/payment/verify", verifyPayment);
+
+// All other routes require authentication
 router.use(requireAuth);
 router.get("/user/orders", getUserOrders);
 router.get("/vendor/orders", requireRole("vendor"), getVendorOrders);
-router.get("/payment/verify", verifyPayment);
 router.get("/:id", getOrderById);
 router.post("/", createOrder);
 router.post("/:id/initialize-payment", initializePayment);

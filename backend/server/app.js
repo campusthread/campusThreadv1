@@ -3,6 +3,8 @@ import express from "express";
 import cookieParser from "cookie-parser";
 import cors from "cors";
 import morgan from "morgan";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 
 import { env } from "./config/env.js";
 import { applySecurityMiddleware } from "./config/security.js";
@@ -22,6 +24,9 @@ import { apiLimiter } from "./middleware/rateLimiter.js";
 import { sendSuccess } from "./utils/response.js";
 
 const app = express();
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const frontendDist = path.join(__dirname, '..', '..', 'frontend', 'dist');
 
 app.set("trust proxy", env.isProduction);
 
@@ -37,6 +42,16 @@ app.use(cookieParser());
 app.use(morgan(env.isProduction ? "combined" : "dev"));
 applySecurityMiddleware(app);
 app.use(auditMiddleware);
+
+if (env.isProduction) {
+  app.use(express.static(frontendDist));
+  app.get('*', (req, res, next) => {
+    if (req.path.startsWith('/api')) {
+      return next();
+    }
+    res.sendFile(path.join(frontendDist, 'index.html'));
+  });
+}
 
 app.get("/health", (req, res) => {
   sendSuccess(res, {

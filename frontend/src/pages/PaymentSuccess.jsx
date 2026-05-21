@@ -7,7 +7,7 @@ import NotificationToast from '../components/NotificationToast'
 import { useTheme } from '../context/ThemeContext'
 import { useNotification } from '../hooks/useNotification'
 import { useAuth } from '../context/AuthContext'
-import { useLazyVerifyPaymentQuery } from '../redux/slices/orderApiSlice'
+import { useVerifyPaymentMutation } from '../redux/slices/orderApiSlice'
 import { useUpdateCartMutation } from '../redux/slices/cartFavoritesApiSlice'
 
 const NAV_LINKS = [
@@ -29,14 +29,21 @@ export default function PaymentSuccess() {
   const [status, setStatus] = useState('Verifying payment...')
   const [error, setError] = useState(null)
   const [order, setOrder] = useState(null)
-  const [verifyPayment] = useLazyVerifyPaymentQuery()
+  const [verifyPayment] = useVerifyPaymentMutation()
   const [updateCart] = useUpdateCartMutation()
   const pageClass = isDark ? 'bg-slate-950 text-slate-100' : 'bg-slate-50 text-slate-950'
   const surfaceClass = isDark ? 'border-white/10 bg-slate-900 text-slate-100 shadow-black/30' : 'border-slate-200 bg-white text-slate-950 shadow-slate-200/70'
   const mutedText = isDark ? 'text-slate-300' : 'text-slate-600'
 
   useEffect(() => {
-    const reference = searchParams.get('reference')
+    const reference =
+      searchParams.get('reference') ||
+      searchParams.get('trxref') ||
+      searchParams.get('tx_ref') ||
+      searchParams.get('txref') ||
+      searchParams.get('ref') ||
+      searchParams.get('transaction_id')
+
     if (!reference) {
       setError('Payment reference not found. Please return to your orders or try again.')
       setStatus(null)
@@ -46,9 +53,13 @@ export default function PaymentSuccess() {
     const verify = async () => {
       try {
         const response = await verifyPayment(reference).unwrap()
-        const verifiedOrder = response.order || response
-        setOrder(verifiedOrder)
-        if (response.order?.paymentStatus === 'paid') {
+        const verifiedOrder = response.data?.order || response.order || null
+        if (verifiedOrder) {
+          setOrder(verifiedOrder)
+        }
+
+        const paymentStatus = verifiedOrder?.paymentStatus
+        if (paymentStatus === 'paid') {
           setStatus('Payment verified successfully!')
           try {
             await updateCart([]).unwrap()

@@ -3,6 +3,7 @@ import { AppError } from "../utils/errors.js";
 import User from "../models/User.js";
 import Order from "../models/Order.js";
 import Product from "../models/Product.js";
+import Brand from "../models/Brand.js";
 import * as emailService from "../services/emailService.js";
 import { logger } from "../utils/logger.js";
 
@@ -10,8 +11,10 @@ const buildDashboardStats = async () => {
   const totalUsers = await User.countDocuments();
   const totalVendors = await User.countDocuments({ role: "vendor" });
   const totalProducts = await Product.countDocuments();
-  const totalOrders = await Order.countDocuments();
+  const totalBrands = await Brand.countDocuments();
+  // Count only paid orders as "placed" orders to avoid counting pending/abandoned payments
   const totalPaidOrders = await Order.countDocuments({ paymentStatus: 'paid' });
+  const totalOrders = totalPaidOrders;
 
   const thirtyDaysAgo = new Date();
   thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
@@ -23,8 +26,7 @@ const buildDashboardStats = async () => {
 
   const orderRevenue = await Order.aggregate([
     { $match: { paymentStatus: 'paid' } },
-    { $unwind: "$items" },
-    { $group: { _id: null, total: { $sum: { $multiply: ["$items.price", "$items.quantity"] } } } },
+    { $group: { _id: null, total: { $sum: '$totalAmount' } } },
   ]);
 
   const totalRevenue = orderRevenue[0]?.total || 0;
@@ -34,6 +36,7 @@ const buildDashboardStats = async () => {
     totalUsers,
     totalVendors,
     totalProducts,
+    totalBrands,
     totalOrders,
     totalRevenue,
     avgOrderValue,
@@ -214,7 +217,9 @@ export const getAllOrders = async (req, res) => {
     const { page = 1, limit = 50 } = req.query;
     const skip = (page - 1) * limit;
 
-    const orders = await Order.find()
+    const filter = { paymentStatus: 'paid' };
+
+    const orders = await Order.find(filter)
       .populate('buyer', 'name email phone')
       .populate('items.product', 'name')
       .populate('items.vendor', 'name brandName')
@@ -222,7 +227,7 @@ export const getAllOrders = async (req, res) => {
       .skip(skip)
       .limit(parseInt(limit));
 
-    const total = await Order.countDocuments();
+    const total = await Order.countDocuments(filter);
 
     sendSuccess(res, {
       message: 'Orders fetched',

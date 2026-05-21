@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { ArrowLeft, CalendarDays, Clock3, Eye, EyeOff, Layers } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { useTheme } from '../context/ThemeContext'
+import { useAuth } from '../context/AuthContext'
 import ConfirmModal from '../components/ConfirmModal'
 import { useGetAllOrdersQuery } from '../redux/slices/adminApiSlice'
 import { orderAPI } from '../utils/api'
@@ -103,7 +104,23 @@ export default function RevenueReport({ role }) {
     }, [orders, filter])
 
     const paidOrders = filteredOrders.filter((order) => order.paymentStatus === 'paid')
-    const totalRevenue = paidOrders.reduce((sum, order) => sum + Number(order.totalAmount || order.total || 0), 0)
+    const { user } = useAuth()
+
+    // For admin we sum full order totals. For vendors, sum only the items that belong to the vendor.
+    const totalRevenue = paidOrders.reduce((sum, order) => {
+        if (role === 'vendor' && user && user._id) {
+            const vendorItemsTotal = (order.items || []).reduce((s, it) => {
+                const vendorId = it.vendor?._id || it.vendor
+                if (!vendorId) return s
+                if (String(vendorId) === String(user._id)) return s + Number(it.price || 0) * Number(it.quantity || 0)
+                return s
+            }, 0)
+            return sum + vendorItemsTotal
+        }
+        return sum + Number(order.totalAmount || order.total || 0)
+    }, 0)
+
+    const platformCommission = Number((totalRevenue * 0.1) || 0)
     const deliveredCount = paidOrders.filter((order) => order.status === 'delivered').length
     const orderCount = paidOrders.length
     const pageTitle = role === 'admin' ? 'Platform Revenue' : 'Store Revenue'
@@ -154,7 +171,7 @@ export default function RevenueReport({ role }) {
                         </button>
                     </div>
 
-                    <div className="grid gap-4 md:grid-cols-3">
+                    <div className="grid gap-4 md:grid-cols-4">
                         <div className="rounded-3xl border border-slate-200 bg-slate-50 p-6 shadow-sm dark:border-slate-800 dark:bg-slate-950">
                             <div className="flex items-center justify-between">
                                 <p className="text-sm font-semibold uppercase tracking-[0.2em] text-violet-700">Total revenue</p>
@@ -171,6 +188,10 @@ export default function RevenueReport({ role }) {
                         <div className="rounded-3xl border border-slate-200 bg-slate-50 p-6 shadow-sm dark:border-slate-800 dark:bg-slate-950">
                             <p className="text-sm font-semibold uppercase tracking-[0.2em] text-violet-700">Delivered</p>
                             <p className="mt-4 text-4xl font-black tracking-tight">{deliveredCount}</p>
+                        </div>
+                        <div className="rounded-3xl border border-slate-200 bg-slate-50 p-6 shadow-sm dark:border-slate-800 dark:bg-slate-950">
+                            <p className="text-sm font-semibold uppercase tracking-[0.2em] text-violet-700">Platform commission (10%)</p>
+                            <p className="mt-4 text-4xl font-black tracking-tight">{showRevenue ? formatCurrency(platformCommission) : '••••••'}</p>
                         </div>
                     </div>
 
@@ -196,30 +217,107 @@ export default function RevenueReport({ role }) {
                                 No orders found for the selected period.
                             </div>
                         ) : (
-                            <div className="overflow-x-auto">
-                                <table className="min-w-full table-auto text-left text-sm">
-                                    <thead className="border-b border-slate-200 text-slate-600 dark:border-slate-800 dark:text-slate-300">
-                                        <tr>
-                                            <th className="px-4 py-3">Order</th>
-                                            <th className="px-4 py-3">Buyer</th>
-                                            <th className="px-4 py-3">Amount</th>
-                                            <th className="px-4 py-3">Status</th>
-                                            <th className="px-4 py-3">Date</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
-                                        {filteredOrders.slice(0, 10).map((order) => (
-                                            <tr key={order._id || order.id}>
-                                                <td className="px-4 py-3 font-semibold">#{String(order._id || order.id || '').slice(-6).toUpperCase()}</td>
-                                                <td className="px-4 py-3 text-slate-600 dark:text-slate-300">{order.buyer?.name || order.buyer?.email || 'Unknown'}</td>
-                                                <td className="px-4 py-3 font-black">{formatCurrency(order.totalAmount || order.total)}</td>
-                                                <td className="px-4 py-3 capitalize text-slate-700 dark:text-slate-200">{order.status || 'pending'}</td>
-                                                <td className="px-4 py-3 text-slate-600 dark:text-slate-300">{new Date(order.createdAt || order.date || Date.now()).toLocaleDateString()}</td>
+                            <>
+                                <div className="overflow-x-auto">
+                                    <table className="min-w-full table-auto text-left text-sm">
+                                        <thead className="border-b border-slate-200 text-slate-600 dark:border-slate-800 dark:text-slate-300">
+                                            <tr>
+                                                <th className="px-4 py-3">Order</th>
+                                                <th className="px-4 py-3">Buyer</th>
+                                                <th className="px-4 py-3">Amount</th>
+                                                <th className="px-4 py-3">Commission</th>
+                                                <th className="px-4 py-3">Status</th>
+                                                <th className="px-4 py-3">Date</th>
                                             </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                            </div>
+                                        </thead>
+                                        <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
+                                            {filteredOrders.slice(0, 10).map((order) => (
+                                                <tr key={order._id || order.id}>
+                                                    <td className="px-4 py-3 font-semibold">#{String(order._id || order.id || '').slice(-6).toUpperCase()}</td>
+                                                    <td className="px-4 py-3 text-slate-600 dark:text-slate-300">{order.buyer?.name || order.buyer?.email || 'Unknown'}</td>
+                                                    {/* show vendor-specific amounts when role is vendor */}
+                                                    <td className="px-4 py-3 font-black">
+                                                        {formatCurrency(
+                                                            role === 'vendor' && user && user._id
+                                                                ? (order.items || []).reduce((s, it) => {
+                                                                    const vendorId = it.vendor?._id || it.vendor
+                                                                    if (!vendorId) return s
+                                                                    if (String(vendorId) === String(user._id)) return s + Number(it.price || 0) * Number(it.quantity || 0)
+                                                                    return s
+                                                                }, 0)
+                                                                : Number(order.totalAmount || order.total || 0)
+                                                        )}
+                                                    </td>
+                                                    <td className="px-4 py-3 font-semibold">
+                                                        {formatCurrency(
+                                                            role === 'vendor' && user && user._id
+                                                                ? ((order.items || []).reduce((s, it) => {
+                                                                    const vendorId = it.vendor?._id || it.vendor
+                                                                    if (!vendorId) return s
+                                                                    if (String(vendorId) === String(user._id)) return s + Number(it.price || 0) * Number(it.quantity || 0)
+                                                                    return s
+                                                                }, 0) * 0.1)
+                                                                : (Number(order.totalAmount || order.total || 0) * 0.1)
+                                                        )}
+                                                    </td>
+                                                    <td className="px-4 py-3 capitalize text-slate-700 dark:text-slate-200">{order.status || 'pending'}</td>
+                                                    <td className="px-4 py-3 text-slate-600 dark:text-slate-300">{new Date(order.createdAt || order.date || Date.now()).toLocaleDateString()}</td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                                {/* Transaction history (paid orders) */}
+                                <div className="mt-6">
+                                    <h3 className="text-lg font-black">Transaction History</h3>
+                                    <div className="mt-3 overflow-x-auto">
+                                        <table className="min-w-full table-auto text-left text-sm">
+                                            <thead className="border-b border-slate-200 text-slate-600 dark:border-slate-800 dark:text-slate-300">
+                                                <tr>
+                                                    <th className="px-4 py-3">Order</th>
+                                                    <th className="px-4 py-3">Buyer</th>
+                                                    <th className="px-4 py-3">Amount</th>
+                                                    <th className="px-4 py-3">Commission (10%)</th>
+                                                    <th className="px-4 py-3">Date</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
+                                                {paidOrders.map((o) => (
+                                                    <tr key={`tx-${o._id}`}>
+                                                        <td className="px-4 py-3 font-semibold">#{String(o._id || o.id || '').slice(-6).toUpperCase()}</td>
+                                                        <td className="px-4 py-3 text-slate-600 dark:text-slate-300">{o.buyer?.name || o.buyer?.email || 'Unknown'}</td>
+                                                        <td className="px-4 py-3 font-black">
+                                                            {formatCurrency(
+                                                                role === 'vendor' && user && user._id
+                                                                    ? (o.items || []).reduce((s, it) => {
+                                                                        const vendorId = it.vendor?._id || it.vendor
+                                                                        if (!vendorId) return s
+                                                                        if (String(vendorId) === String(user._id)) return s + Number(it.price || 0) * Number(it.quantity || 0)
+                                                                        return s
+                                                                    }, 0)
+                                                                    : Number(o.totalAmount || o.total || 0)
+                                                            )}
+                                                        </td>
+                                                        <td className="px-4 py-3 font-semibold">
+                                                            {formatCurrency(
+                                                                role === 'vendor' && user && user._id
+                                                                    ? ((o.items || []).reduce((s, it) => {
+                                                                        const vendorId = it.vendor?._id || it.vendor
+                                                                        if (!vendorId) return s
+                                                                        if (String(vendorId) === String(user._id)) return s + Number(it.price || 0) * Number(it.quantity || 0)
+                                                                        return s
+                                                                    }, 0) * 0.1)
+                                                                    : (Number(o.totalAmount || o.total || 0) * 0.1)
+                                                            )}
+                                                        </td>
+                                                        <td className="px-4 py-3 text-slate-600 dark:text-slate-300">{new Date(o.createdAt || o.date || Date.now()).toLocaleString()}</td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </>
                         )}
                     </div>
                 </div>

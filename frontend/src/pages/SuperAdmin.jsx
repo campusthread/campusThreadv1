@@ -1,8 +1,9 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+﻿import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { BarChart3, Boxes, LayoutDashboard, List, Loader2, LogOut, Megaphone, Menu, Moon, Receipt, Save, Sun, Tags, Trash2, Terminal, X, Users, CheckCircle2, XCircle, AlertCircle } from 'lucide-react'
 import { useTheme } from '../context/ThemeContext'
 import ConfirmModal from '../components/ConfirmModal'
+import SectionLoader from '../components/SectionLoader'
 import { useGetBrandsQuery, useCreateBrandMutation, useDeleteBrandMutation } from '../redux/slices/brandApiSlice'
 import { useGetCategoriesQuery, useCreateCategoryMutation, useDeleteCategoryMutation } from '../redux/slices/categoryApiSlice'
 import { useGetAdsQuery, useCreateAdMutation, useDeleteAdMutation } from '../redux/slices/adApiSlice'
@@ -326,18 +327,36 @@ export default function SuperAdmin() {
               <SectionLoader message="Loading dashboard..." isDark={isDark} />
             ) : (
               <div className="space-y-6">
+                <div className={cx('rounded-lg border p-6 shadow-lg', isDark ? 'border-violet-500/20 bg-gradient-to-br from-violet-900/30 to-violet-800/20' : 'border-violet-200 bg-gradient-to-br from-violet-50 to-violet-100/50')}>
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <h2 className={cx('text-sm font-semibold uppercase tracking-wider', isDark ? 'text-violet-400' : 'text-violet-600')}>💰 Platform Revenue Summary</h2>
+                      <div className="mt-4 space-y-3">
+                        <div>
+                          <p className={cx('text-xs', mutedText)}>Total Revenue (All Paid Orders)</p>
+                          <p className="mt-1 text-4xl font-black">₦{Number(dashboardStats.totalRevenue || 0).toLocaleString()}</p>
+                        </div>
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <p className={cx('text-xs', mutedText)}>Paid Orders</p>
+                            <p className="mt-1 text-2xl font-bold">{dashboardStats.totalOrders || 0}</p>
+                          </div>
+                          <div>
+                            <p className={cx('text-xs', mutedText)}>Avg per Order</p>
+                            <p className="mt-1 text-2xl font-bold">₦{Number(dashboardStats.avgOrderValue || 0).toLocaleString()}</p>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="text-5xl opacity-20">💵</div>
+                  </div>
+                </div>
+
                 <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
                   <StatCard title="Total Users" value={dashboardStats.totalUsers || 0} surfaceClass={surfaceClass} isDark={isDark} />
                   <StatCard title="Total Vendors" value={dashboardStats.totalVendors || 0} surfaceClass={surfaceClass} isDark={isDark} onClick={() => navigate('/super-admin/vendors')} />
                   <StatCard title="Pending Vendors" value={vendors.length} surfaceClass={surfaceClass} isDark={isDark} />
-                  <StatCard
-                    title="Total Revenue"
-                    value={`₦${(dashboardStats.totalRevenue || 0).toLocaleString()}`}
-                    sensitive
-                    surfaceClass={surfaceClass}
-                    isDark={isDark}
-                    onClick={() => navigate('/super-admin/revenue')}
-                  />
+                  <StatCard title="Orders" value={orders.length} surfaceClass={surfaceClass} isDark={isDark} />
                 </div>
 
                 <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -347,84 +366,153 @@ export default function SuperAdmin() {
                   <StatCard title="Active Ads" value={ads.length} surfaceClass={surfaceClass} isDark={isDark} />
                 </div>
 
-                <div className="grid gap-4 sm:grid-cols-1 lg:grid-cols-2">
-                  <StatCard
-                    title="SuperAdmin Commission"
-                    value={`₦${Math.round((dashboardStats.totalRevenue || 0) * 0.1).toLocaleString()}`}
-                    sensitive
-                    surfaceClass={surfaceClass}
-                    isDark={isDark}
-                    onClick={() => navigate('/super-admin/commission')}
-                  />
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <StatCard title="Total Revenue" value={`₦${Number(dashboardStats.totalRevenue || 0).toLocaleString()}`} surfaceClass={surfaceClass} isDark={isDark} sensitive={true} />
+                  <StatCard title="Avg Order Value" value={`₦${Number(dashboardStats.avgOrderValue || 0).toLocaleString()}`} surfaceClass={surfaceClass} isDark={isDark} />
                 </div>
+
+                <Panel title="Recent Orders" surfaceClass={surfaceClass}>
+                  {orders.length === 0 ? (
+                    <div className={cx('rounded-3xl border border-dashed p-8 text-center', surfaceClass)}>
+                      No orders yet
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      {orders.slice(0, 5).map((order) => (
+                        <div key={order._id} className={cx('rounded-3xl border p-4', surfaceClass)}>
+                          <div className="flex flex-wrap items-center justify-between gap-3">
+                            <div>
+                              <p className="font-bold">#{order.orderNumber || order._id.slice(-6).toUpperCase()}</p>
+                              <p className={cx('text-sm', mutedText)}>{order.buyer?.name || 'Unknown buyer'}</p>
+                              <p className={cx('text-xs', mutedText)}>{order.buyer?.email || 'No email'}</p>
+                            </div>
+                            <div className="text-right">
+                              <p className="font-black">₦{Number(order.totalAmount || order.total || 0).toLocaleString()}</p>
+                              <p className={cx('text-xs', mutedText)}>{humanizeStatus(order.status)}</p>
+                            </div>
+                          </div>
+                          <div className="mt-3 space-y-2 text-xs text-slate-500 dark:text-slate-300">
+                            <div>
+                              <span className="font-semibold">Products:</span>
+                              <div className="mt-1 space-y-1">
+                                {order.items?.map((item, idx) => (
+                                  <div key={`${item.product || item.name}-${idx}`}>{item.name} ×{item.quantity}</div>
+                                ))}
+                              </div>
+                            </div>
+                            <div>
+                              <span className="font-semibold">Shipping:</span> {order.shippingAddress?.address || 'No address'}, {order.shippingAddress?.city || ''} {order.shippingAddress?.state || ''}
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </Panel>
               </div>
             )
           )}
           {section === 'orders' && (
             <Panel title="Order Management" surfaceClass={surfaceClass}>
-              <div className="overflow-x-auto">
-                <table className="w-full table-fixed text-left text-xs">
-                  <colgroup>
-                    <col style={{ width: '8%' }} />
-                    <col style={{ width: '18%' }} />
-                    <col style={{ width: '18%' }} />
-                    <col style={{ width: '6%' }} />
-                    <col style={{ width: '20%' }} />
-                    <col style={{ width: '10%' }} />
-                    <col style={{ width: '10%' }} />
-                    <col style={{ width: '10%' }} />
-                    <col style={{ width: '10%' }} />
-                  </colgroup>
-                  <thead className={isDark ? 'bg-slate-950' : 'bg-slate-100'}>
-                    <tr>
-                      {['Order', 'Buyer', 'Items', 'Qty', 'Ship', 'Amt', 'Pay', 'Status', 'Date'].map((head) => <th key={head} className="px-3 py-2 font-black whitespace-normal break-words">{head}</th>)}
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-200 dark:divide-white/10">
-                    {ordersLoading ? (
-                      <tr>
-                        <td colSpan="9" className="px-4 py-12 text-center"><SectionLoader message="Loading orders..." isDark={isDark} /></td>
-                      </tr>
-                    ) : orders.length > 0 ? orders.map((order) => {
+              {ordersLoading ? (
+                <SectionLoader message="Loading orders..." isDark={isDark} />
+              ) : orders.length === 0 ? (
+                <div className="rounded-3xl border border-dashed border-slate-300 bg-white p-10 text-center text-slate-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300">
+                  No orders found
+                </div>
+              ) : (
+                <>
+                  <div className="space-y-4 sm:hidden">
+                    {orders.map((order) => {
                       const totalQty = order.items?.reduce((sum, item) => sum + (item.quantity || 0), 0) || 0
                       return (
-                        <tr key={order._id}>
-                          <td className="px-3 py-2 font-bold text-xs">#{order._id.slice(-6).toUpperCase()}</td>
-                          <td className="px-3 py-2 max-w-[160px] whitespace-normal text-xs">
-                            <div className="font-bold truncate">{order.buyer?.name || 'Unknown buyer'}</div>
-                            <div className="truncate text-slate-500">{order.buyer?.email}</div>
-                            <div className="truncate text-slate-500">{order.buyer?.phone || 'No phone'}</div>
-                          </td>
-                          <td className="px-3 py-2 max-w-[180px] whitespace-normal text-xs text-slate-500">
-                            <div className="space-y-1">
-                              {order.items?.map((item, idx) => (
-                                <div key={`${item.product || item.name}-${idx}`}>{item.name} ×{item.quantity}</div>
-                              ))}
+                        <div key={order._id} className={cx('rounded-3xl border p-4 shadow-sm', surfaceClass)}>
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <p className="font-bold">#{order._id.slice(-6).toUpperCase()}</p>
+                            <p className="text-xs text-slate-500 dark:text-slate-400">{new Date(order.createdAt).toLocaleDateString()}</p>
+                          </div>
+                          <div className="mt-3 space-y-2 text-xs text-slate-600 dark:text-slate-300">
+                            <div>
+                              <span className="font-semibold">Buyer:</span> {order.buyer?.name || order.buyer?.email || 'Unknown'}
                             </div>
-                          </td>
-                          <td className="px-4 py-3">{totalQty}</td>
-                          <td className="px-3 py-2 max-w-[180px] whitespace-normal text-xs">
-                            <div className="font-bold truncate">{order.shippingAddress?.name || 'No name'}</div>
-                            <div className="truncate text-slate-500">{order.shippingAddress?.address || 'No address'}</div>
-                            <div className="truncate text-slate-500">{[order.shippingAddress?.city, order.shippingAddress?.state, order.shippingAddress?.zipCode].filter(Boolean).join(', ')}</div>
-                          </td>
-                          <td className="px-3 py-2 text-xs">₦{Number(order.totalAmount || order.total || 0).toLocaleString()}</td>
-                          <td className="px-3 py-2 text-xs">
-                            <div className="font-bold truncate">{order.paymentMethod || 'Unknown'}</div>
-                            <div className="truncate text-slate-500">{order.paymentStatus || 'pending'}</div>
-                          </td>
-                          <td className="px-4 py-3">{humanizeStatus(order.status)}</td>
-                          <td className="px-4 py-3">{new Date(order.createdAt).toLocaleDateString()}</td>
-                        </tr>
+                            <div>
+                              <span className="font-semibold">Amount:</span> ₦{Number(order.totalAmount || order.total || 0).toLocaleString()}
+                            </div>
+                            <div>
+                              <span className="font-semibold">Status:</span> {humanizeStatus(order.status)}
+                            </div>
+                            <div>
+                              <span className="font-semibold">Payment:</span> {order.paymentMethod || 'Unknown'} / {order.paymentStatus || 'pending'}
+                            </div>
+                            <div>
+                              <span className="font-semibold">Items:</span> {order.items?.map((item) => `${item.name}×${item.quantity}`).join(', ') || 'No items'}
+                            </div>
+                            <div>
+                              <span className="font-semibold">Ship to:</span> {order.shippingAddress?.name || 'No name'}, {order.shippingAddress?.city || ''}{order.shippingAddress?.city && order.shippingAddress?.state ? ', ' : ''}{order.shippingAddress?.state || ''}
+                            </div>
+                          </div>
+                        </div>
                       )
-                    }) : (
-                      <tr>
-                        <td colSpan="9" className="px-4 py-8 text-center text-slate-500">No orders found</td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
+                    })}
+                  </div>
+
+                  <div className="hidden sm:block overflow-x-auto">
+                    <table className="min-w-[900px] w-full table-auto text-left text-xs">
+                      <colgroup>
+                        <col style={{ width: '8%' }} />
+                        <col style={{ width: '18%' }} />
+                        <col style={{ width: '18%' }} />
+                        <col style={{ width: '6%' }} />
+                        <col style={{ width: '20%' }} />
+                        <col style={{ width: '10%' }} />
+                        <col style={{ width: '10%' }} />
+                        <col style={{ width: '10%' }} />
+                        <col style={{ width: '10%' }} />
+                      </colgroup>
+                      <thead className={isDark ? 'bg-slate-950' : 'bg-slate-100'}>
+                        <tr>
+                          {['Order', 'Buyer', 'Items', 'Qty', 'Ship', 'Amt', 'Pay', 'Status', 'Date'].map((head) => <th key={head} className="px-3 py-2 font-black whitespace-normal break-words">{head}</th>)}
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-200 dark:divide-white/10">
+                        {orders.map((order) => {
+                          const totalQty = order.items?.reduce((sum, item) => sum + (item.quantity || 0), 0) || 0
+                          return (
+                            <tr key={order._id}>
+                              <td className="px-3 py-2 font-bold text-xs">#{order._id.slice(-6).toUpperCase()}</td>
+                              <td className="px-3 py-2 max-w-[160px] whitespace-normal text-xs">
+                                <div className="font-bold truncate">{order.buyer?.name || 'Unknown buyer'}</div>
+                                <div className="truncate text-slate-500">{order.buyer?.email}</div>
+                                <div className="truncate text-slate-500">{order.buyer?.phone || 'No phone'}</div>
+                              </td>
+                              <td className="px-3 py-2 max-w-[180px] whitespace-normal text-xs text-slate-500">
+                                <div className="space-y-1">
+                                  {order.items?.map((item, idx) => (
+                                    <div key={`${item.product || item.name}-${idx}`}>{item.name} ×{item.quantity}</div>
+                                  ))}
+                                </div>
+                              </td>
+                              <td className="px-4 py-3">{totalQty}</td>
+                              <td className="px-3 py-2 max-w-[180px] whitespace-normal text-xs">
+                                <div className="font-bold truncate">{order.shippingAddress?.name || 'No name'}</div>
+                                <div className="truncate text-slate-500">{order.shippingAddress?.address || 'No address'}</div>
+                                <div className="truncate text-slate-500">{[order.shippingAddress?.city, order.shippingAddress?.state, order.shippingAddress?.zipCode].filter(Boolean).join(', ')}</div>
+                              </td>
+                              <td className="px-3 py-2 text-xs">₦{Number(order.totalAmount || order.total || 0).toLocaleString()}</td>
+                              <td className="px-3 py-2 text-xs">
+                                <div className="font-bold truncate">{order.paymentMethod || 'Unknown'}</div>
+                                <div className="truncate text-slate-500">{order.paymentStatus || 'pending'}</div>
+                              </td>
+                              <td className="px-4 py-3">{humanizeStatus(order.status)}</td>
+                              <td className="px-4 py-3">{new Date(order.createdAt).toLocaleDateString()}</td>
+                            </tr>
+                          )
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </>
+              )}
             </Panel>
           )}
 
@@ -432,7 +520,7 @@ export default function SuperAdmin() {
           {section === 'debug' && (
             <Panel title="Admin Debug Console" surfaceClass={surfaceClass}>
               <div className="space-y-6">
-                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
                   {[
                     { label: 'Products', items: safeProducts, loading: productsLoading, error: productsError },
                     { label: 'Brands', items: safeBrands, loading: brandsLoading, error: brandsError },
@@ -441,15 +529,15 @@ export default function SuperAdmin() {
                     { label: 'Users', items: users, loading: usersLoading, error: usersError },
                     { label: 'Pending Vendors', items: vendors, loading: vendorsLoading, error: vendorsError },
                   ].map((debugItem) => (
-                    <div key={debugItem.label} className={cx('rounded-lg border p-4', isDark ? 'border-white/10 bg-slate-800' : 'border-slate-200 bg-slate-50')}>
-                      <div className="mb-3 flex items-center justify-between gap-3">
-                        <div>
+                    <div key={debugItem.label} className={cx('min-w-0 rounded-lg border p-4', isDark ? 'border-white/10 bg-slate-800' : 'border-slate-200 bg-slate-50')}>
+                      <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+                        <div className="min-w-0">
                           <h3 className="font-bold">{debugItem.label}</h3>
                           <p className={cx('text-xs', mutedText)}>{debugItem.loading ? 'Loading…' : debugItem.error ? 'Error fetching backend data' : 'Backend fetch OK'}</p>
                         </div>
                         <span className="rounded-full bg-slate-200 px-2 py-1 text-xs font-semibold text-slate-700 dark:bg-slate-700 dark:text-slate-100">{Array.isArray(debugItem.items) ? debugItem.items.length : 'N/A'}</span>
                       </div>
-                      <pre className={cx('max-h-52 overflow-auto rounded-md border p-3 text-xs', isDark ? 'border-white/10 bg-slate-950 text-slate-100' : 'border-slate-200 bg-white text-slate-900')}>
+                      <pre className={cx('max-h-52 w-full overflow-auto rounded-md border p-3 text-xs whitespace-pre-wrap break-words', isDark ? 'border-white/10 bg-slate-950 text-slate-100' : 'border-slate-200 bg-white text-slate-900')}>
                         {JSON.stringify(debugItem.items.slice(0, 10), null, 2)}
                       </pre>
                       {Array.isArray(debugItem.items) && debugItem.items.length > 10 && (
@@ -460,7 +548,7 @@ export default function SuperAdmin() {
                 </div>
                 <div className={cx('rounded-lg border p-4', isDark ? 'border-white/10 bg-slate-800' : 'border-slate-200 bg-slate-50')}>
                   <h3 className="font-bold">Dashboard Stats</h3>
-                  <pre className={cx('max-h-72 overflow-auto rounded-md border p-3 text-xs', isDark ? 'border-white/10 bg-slate-950 text-slate-100' : 'border-slate-200 bg-white text-slate-900')}>
+                  <pre className={cx('max-h-72 w-full overflow-auto rounded-md border p-3 text-xs whitespace-pre-wrap break-words', isDark ? 'border-white/10 bg-slate-950 text-slate-100' : 'border-slate-200 bg-white text-slate-900')}>
                     {JSON.stringify(dashboardStats, null, 2)}
                   </pre>
                 </div>
@@ -495,7 +583,7 @@ export default function SuperAdmin() {
                     </div>
 
                     <div className={cx('rounded-lg border p-6', isDark ? 'border-white/10 bg-slate-800' : 'border-slate-200 bg-slate-50')}>
-                      <h3 className="font-bold">Sales Analytics</h3>
+                      <h3 className="font-bold">Order Analytics</h3>
                       <div className="mt-4 space-y-2">
                         <div className="flex justify-between">
                           <span className={mutedText}>Total Orders</span>
@@ -503,11 +591,44 @@ export default function SuperAdmin() {
                         </div>
                         <div className="flex justify-between">
                           <span className={mutedText}>Total Revenue</span>
-                          <span className="font-bold">₦{(dashboardStats.totalRevenue || 0).toLocaleString()}</span>
+                          <span className="font-bold">₦{Number(dashboardStats.totalRevenue || 0).toLocaleString()}</span>
                         </div>
                         <div className="flex justify-between">
                           <span className={mutedText}>Avg Order Value</span>
-                          <span className="font-bold">₦{Math.round((dashboardStats.avgOrderValue || 0)).toLocaleString()}</span>
+                          <span className="font-bold">₦{Number(dashboardStats.avgOrderValue || 0).toLocaleString()}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <div className={cx('rounded-lg border p-6', isDark ? 'border-white/10 bg-slate-800' : 'border-slate-200 bg-slate-50')}>
+                      <h3 className={cx('font-bold', isDark ? 'text-violet-400' : 'text-violet-600')}>💰 Revenue Metrics</h3>
+                      <div className="mt-4 space-y-2">
+                        <div className="flex justify-between">
+                          <span className={mutedText}>Total Revenue</span>
+                          <span className="font-black text-lg">₦{Number(dashboardStats.totalRevenue || 0).toLocaleString()}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className={mutedText}>Avg Order Value</span>
+                          <span className="font-bold">₦{Number(dashboardStats.avgOrderValue || 0).toLocaleString()}</span>
+                        </div>
+                        <div className="mt-3 pt-3" style={isDark ? { borderTop: '1px solid rgba(255, 255, 255, 0.1)' } : { borderTop: '1px solid rgba(0, 0, 0, 0.1)' }}>
+                          <p className={cx('text-xs', mutedText)}>Revenue from all paid orders on the platform</p>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className={cx('rounded-lg border p-6', isDark ? 'border-white/10 bg-slate-800' : 'border-slate-200 bg-slate-50')}>
+                      <h3 className="font-bold">Catalog Statistics</h3>
+                      <div className="mt-4 space-y-2">
+                        <div className="flex justify-between">
+                          <span className={mutedText}>Total Products</span>
+                          <span className="font-bold">{dashboardStats.totalProducts || 0}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className={mutedText}>Total Brands</span>
+                          <span className="font-bold">{dashboardStats.totalBrands || 0}</span>
                         </div>
                       </div>
                     </div>
@@ -606,7 +727,7 @@ export default function SuperAdmin() {
                     <div key={vendor._id} className={cx('rounded-lg border p-4', isDark ? 'border-white/10 bg-slate-800' : 'border-slate-200 bg-slate-50')}>
                       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                         <div>
-                          <h3 className="font-bold text-slate-950 dark:text-slate-100">{vendor.brandName || vendor.name || 'Unknown vendor'}</h3>
+                          <h3 className={cx('font-bold', isDark ? 'text-slate-100' : 'text-slate-950')}>{vendor.brandName || vendor.name || 'Unknown vendor'}</h3>
                           <p className={cx('text-sm', mutedText)}>{vendor.email}</p>
                           <p className={cx('mt-1 text-sm', mutedText)}>Account: {vendor.accountHolderName}</p>
                           <p className={cx('text-sm', mutedText)}>Bank: {vendor.bankName}</p>
@@ -910,11 +1031,4 @@ function StatCard({ title, value, surfaceClass, isDark, onClick, sensitive = fal
   )
 }
 
-function SectionLoader({ message, isDark }) {
-  return (
-    <div className={cx('flex flex-col items-center justify-center rounded-2xl border p-10 text-center', isDark ? 'border-white/10 bg-slate-900 text-slate-100' : 'border-slate-200 bg-white text-slate-950')}>
-      <Loader2 className="mb-4 animate-spin" size={32} />
-      <p className={cx('text-sm font-semibold', isDark ? 'text-slate-300' : 'text-slate-600')}>{message}</p>
-    </div>
-  )
-}
+

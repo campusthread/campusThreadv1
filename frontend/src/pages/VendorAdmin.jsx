@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Box, Eye, EyeOff, ImagePlus, LayoutDashboard, LogOut, Menu, PackagePlus, Receipt, Save, Settings2, ShoppingBag, Store, Trash2, UserCircle2, X } from 'lucide-react'
+import { Box, Eye, EyeOff, ImagePlus, LayoutDashboard, LogOut, Menu, PackagePlus, Receipt, Save, Settings2, ShoppingBag, Store, Trash2, TrendingUp, UserCircle2, X } from 'lucide-react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useTheme } from '../context/ThemeContext'
+import Carousel from '../components/Carousel'
 import { useAuth } from '../context/AuthContext'
 import ConfirmModal from '../components/ConfirmModal'
 import SectionLoader from '../components/SectionLoader'
@@ -37,14 +38,10 @@ export default function VendorAdmin() {
   const [profileFilePreview, setProfileFilePreview] = useState(null)
   const [products, setProducts] = useState([])
   const [orders, setOrders] = useState([])
-  const [showRevenue, setShowRevenue] = useState(() => {
-    const saved = localStorage.getItem('dashboardShowRevenue')
-    return saved === 'false' ? false : true
-  })
   const [editingProductId, setEditingProductId] = useState(null)
   const [productForm, setProductForm] = useState({ name: '', description: '', price: '', category: '', stock: '' })
-  const [productFile, setProductFile] = useState(null)
-  const [productFilePreview, setProductFilePreview] = useState(null)
+  const [productFiles, setProductFiles] = useState([])
+  const [productFilePreviews, setProductFilePreviews] = useState([])
   const [confirmDialog, setConfirmDialog] = useState({ open: false, title: '', description: '', confirmLabel: 'Delete', cancelLabel: 'Cancel', onConfirm: null, loading: false })
 
   const pageClass = isDark ? 'bg-slate-950 text-slate-100' : 'bg-slate-50 text-slate-950'
@@ -56,10 +53,6 @@ export default function VendorAdmin() {
   useEffect(() => {
     if (!isAuthenticated || user?.role !== 'vendor') navigate('/auth')
   }, [isAuthenticated, navigate, user])
-
-  useEffect(() => {
-    localStorage.setItem('dashboardShowRevenue', showRevenue)
-  }, [showRevenue])
 
   useEffect(() => {
     if (!isAuthenticated || user?.role !== 'vendor') return
@@ -98,16 +91,22 @@ export default function VendorAdmin() {
 
   const stats = useMemo(() => {
     const paidOrders = orders.filter((order) => order.paymentStatus === 'paid')
-    const completedOrders = paidOrders.filter((order) => order.status === 'delivered').length
     const pendingOrders = orders.filter((order) => order.status === 'pending').length
-    const totalRevenue = paidOrders.reduce((sum, order) => sum + Number(order.totalAmount || order.total || 0), 0)
     return [
       { label: 'Products live', value: products.length },
       { label: 'Orders', value: orders.length },
       { label: 'Pending', value: pendingOrders },
-      { label: 'Revenue', value: showRevenue ? formatCurrency(totalRevenue) : '••••', detail: `${completedOrders} delivered`, hasToggle: true },
     ]
-  }, [orders, products, showRevenue])
+  }, [orders, products])
+
+  const getVendorOrderItems = (order) => {
+    const vendorId = user?._id || user?.id
+    if (!order?.items || !vendorId) return order.items || []
+    return order.items.filter((item) => {
+      const itemVendor = item.vendor?._id || item.vendor
+      return String(itemVendor) === String(vendorId)
+    })
+  }
 
   const showTimedSuccess = (message) => {
     setSuccess(message)
@@ -117,8 +116,8 @@ export default function VendorAdmin() {
   const resetProductForm = () => {
     setEditingProductId(null)
     setProductForm({ name: '', description: '', price: '', category: '', stock: '' })
-    setProductFile(null)
-    setProductFilePreview(null)
+    setProductFiles([])
+    setProductFilePreviews([])
   }
 
   const handleProfileFileSelect = (event) => {
@@ -152,18 +151,31 @@ export default function VendorAdmin() {
   }
 
   const handleProductFileSelect = (event) => {
-    const file = event.target.files?.[0]
-    if (!file) return
-    if (file.size > 10 * 1024 * 1024) return setError('File size must be less than 10MB')
-    setProductFile(file)
-    setProductFilePreview(URL.createObjectURL(file))
+    const files = Array.from(event.target.files || [])
+    if (!files.length) return
+
+    const imageFiles = files.filter((file) => file.type.startsWith('image/'))
+    if (imageFiles.length !== files.length) return setError('Please upload only image files')
+    if (imageFiles.some((file) => file.size > 10 * 1024 * 1024)) return setError('Each image must be less than 10MB')
+    if (imageFiles.length > 4) return setError('You can upload up to 4 images per product')
+
+    const existingImageCount = editingProductId
+      ? products.find((product) => product._id === editingProductId)?.images?.length || 0
+      : 0
+
+    if (existingImageCount + imageFiles.length > 4) {
+      return setError('You can only have up to 4 images per product')
+    }
+
+    setProductFiles(imageFiles)
+    setProductFilePreviews(imageFiles.map((file) => URL.createObjectURL(file)))
   }
 
   const handleStartEditProduct = (product) => {
     setEditingProductId(product._id)
     setProductForm({ name: product.name || '', description: product.description || '', price: product.price || '', category: product.category || '', stock: product.stock || '' })
-    setProductFile(null)
-    setProductFilePreview(product.images?.[0]?.url || product.videos?.[0]?.url || null)
+    setProductFiles([])
+    setProductFilePreviews(product.images?.length > 0 ? product.images.map((image) => image.url) : [product.videos?.[0]?.url].filter(Boolean))
     setActiveTab('products')
   }
 
@@ -177,10 +189,12 @@ export default function VendorAdmin() {
       let resultProduct = isEditing
         ? (await productAPI.update(editingProductId, payload)).product
         : (await productAPI.create(payload)).product
-      if (productFile && resultProduct?._id) {
-        const uploadResult = await productAPI.uploadMedia(resultProduct._id, productFile)
+
+      if (productFiles.length && resultProduct?._id) {
+        const uploadResult = await productAPI.uploadMedia(resultProduct._id, productFiles)
         resultProduct = uploadResult.product || resultProduct
       }
+
       setProducts((current) => isEditing ? current.map((product) => product._id === resultProduct._id ? resultProduct : product) : [resultProduct, ...current])
       resetProductForm()
       showTimedSuccess(isEditing ? 'Product updated successfully.' : 'Product added successfully.')
@@ -252,7 +266,15 @@ export default function VendorAdmin() {
         </div>
         <nav className="mt-8 grid gap-2">
           {tabs.map(({ id, icon: Icon, label }) => (
-            <button key={id} type="button" onClick={() => { setActiveTab(id); setMobileMenuOpen(false) }} className={cx('flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-bold transition', activeTab === id ? 'bg-violet-700 text-white' : isDark ? 'text-slate-300 hover:bg-white/5' : 'text-slate-700 hover:bg-slate-100')}>
+            <button
+              key={id}
+              type="button"
+              onClick={() => {
+                setActiveTab(id)
+                setMobileMenuOpen(false)
+              }}
+              className={cx('flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-bold transition', activeTab === id ? 'bg-violet-700 text-white' : isDark ? 'text-slate-300 hover:bg-white/5' : 'text-slate-700 hover:bg-slate-100')}
+            >
               <Icon size={18} />
               {label}
             </button>
@@ -317,25 +339,13 @@ export default function VendorAdmin() {
           ) : (
             <>
               <section className="mb-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-                {stats.map((stat) => {
-                  const isRevenue = stat.label === 'Revenue'
-                  return (
-                    <button
-                      key={stat.label}
-                      type="button"
-                      onClick={isRevenue ? () => navigate('/vendor-admin/revenue') : undefined}
-                      className={cx(
-                        'rounded-2xl border p-5 text-left shadow-lg transition',
-                        surfaceClass,
-                        isRevenue ? 'cursor-pointer hover:-translate-y-0.5 hover:shadow-xl' : '',
-                      )}
-                    >
-                      <p className="text-xs font-black uppercase tracking-wide text-violet-700">{stat.label}</p>
-                      <h3 className="mt-2 text-3xl font-black tracking-normal">{stat.value}</h3>
-                      {stat.detail && <p className={cx('mt-1 text-sm', mutedText)}>{stat.detail}</p>}
-                    </button>
-                  )
-                })}
+                {stats.map((stat) => (
+                  <div key={stat.label} className={cx('rounded-2xl border p-5 text-left shadow-lg', surfaceClass)}>
+                    <p className="text-xs font-black uppercase tracking-wide text-violet-700">{stat.label}</p>
+                    <h3 className="mt-2 text-3xl font-black tracking-normal">{stat.value}</h3>
+                    {stat.detail && <p className={cx('mt-1 text-sm', mutedText)}>{stat.detail}</p>}
+                  </div>
+                ))}
               </section>
 
               {activeTab === 'dashboard' && (
@@ -348,13 +358,41 @@ export default function VendorAdmin() {
                       </button>
                     )} />
                   </Panel>
-                  <Panel title="Recent Orders" surfaceClass={surfaceClass}>
-                    <List products={orders.slice(0, 5)} empty="No orders yet." render={(order) => (
-                      <div key={order._id} className={cx('flex items-center justify-between rounded-xl border p-4', softClass)}>
-                        <span><strong>#{order._id.slice(-6).toUpperCase()}</strong><small className={cx('block', mutedText)}>{order.buyer?.name || 'Unknown buyer'}</small></span>
-                        <span className="font-black text-violet-700">{formatCurrency(order.totalAmount || order.total)}</span>
-                      </div>
-                    )} />
+                  <Panel title="Recent Vendor Orders" surfaceClass={surfaceClass}>
+                    <List products={orders.slice(0, 5)} empty="No orders yet." render={(order) => {
+                      const vendorItems = getVendorOrderItems(order)
+                      const displayAmount = vendorItems.reduce((sum, item) => sum + (item.price || 0) * (item.quantity || 0), 0)
+
+                      return (
+                        <div key={order._id} className={cx('rounded-3xl border p-4', softClass)}>
+                          <div className="flex flex-wrap items-start justify-between gap-4">
+                            <div>
+                              <p className="font-bold">#{order._id.slice(-6).toUpperCase()}</p>
+                              <p className={cx('mt-1 text-xs', mutedText)}>{order.buyer?.name || 'Unknown buyer'}</p>
+                              <p className={cx('text-xs', mutedText)}>{order.buyer?.email || 'No email'}</p>
+                              <p className={cx('text-xs', mutedText)}>{order.buyer?.phone || 'No phone'}</p>
+                            </div>
+                            <div className="text-right">
+                              <p className="font-black text-violet-700">{formatCurrency(displayAmount)}</p>
+                              <p className={cx('text-xs', mutedText)}>{vendorItems.length} item(s)</p>
+                            </div>
+                          </div>
+                          <div className="mt-4 space-y-2 text-xs text-slate-600 dark:text-slate-300">
+                            <div>
+                              <span className="font-semibold">Ordered products:</span>
+                              <div className="mt-2 space-y-1">
+                                {vendorItems.length > 0 ? vendorItems.map((item, idx) => (
+                                  <div key={`${item.product || item.name}-${idx}`}>{item.name} ×{item.quantity}</div>
+                                )) : <div>No vendor item details available</div>}
+                              </div>
+                            </div>
+                            <div>
+                              <span className="font-semibold">Shipping:</span> {order.shippingAddress?.address || 'No address'}, {order.shippingAddress?.city || ''} {order.shippingAddress?.state || ''}
+                            </div>
+                          </div>
+                        </div>
+                      )
+                    }} />
                   </Panel>
                 </section>
               )}
@@ -421,8 +459,14 @@ export default function VendorAdmin() {
                         <Field label="Stock"><input type="number" min="0" value={productForm.stock} onChange={(event) => setProductForm({ ...productForm, stock: event.target.value })} required className={inputClass} /></Field>
                       </div>
                       <Field label="Category"><select value={productForm.category} onChange={(event) => setProductForm({ ...productForm, category: event.target.value })} required className={inputClass}><option value="">Select category</option>{productCategories.map((category) => <option key={category} value={category}>{category}</option>)}</select></Field>
-                      <input type="file" accept="image/*,video/*" onChange={handleProductFileSelect} className="text-sm" />
-                      {productFilePreview && <img src={productFilePreview} alt="Preview" className="h-36 rounded-xl object-cover" />}
+                      <input type="file" accept="image/*" multiple onChange={handleProductFileSelect} className="text-sm" />
+                      {productFilePreviews.length > 0 && (
+                        <div className="grid grid-cols-2 gap-2">
+                          {productFilePreviews.map((preview, idx) => (
+                            <img key={`${preview}-${idx}`} src={preview} alt={`Preview ${idx + 1}`} className="h-36 w-full rounded-xl object-cover" />
+                          ))}
+                        </div>
+                      )}
                       <button className="inline-flex w-fit items-center gap-2 rounded-lg bg-violet-700 px-5 py-3 text-sm font-bold text-white disabled:opacity-60" disabled={submitting}><PackagePlus size={16} /> {editingProductId && editingProductId !== 'new' ? 'Update product' : 'Publish product'}</button>
                     </form>
                   </Panel>
@@ -430,7 +474,15 @@ export default function VendorAdmin() {
                     <div className="grid gap-4 sm:grid-cols-2">
                       {products.map((product) => (
                         <article key={product._id} className={cx('rounded-xl border p-4', softClass)}>
-                          {product.images?.[0]?.url ? <img src={product.images[0].url} alt={product.name} className="mb-3 h-36 w-full rounded-lg object-cover" /> : <div className="mb-3 grid h-36 place-items-center rounded-lg bg-slate-100"><Box /></div>}
+                          {product.images?.length > 1 ? (
+                            <div className="mb-3 h-36 w-full overflow-hidden rounded-lg">
+                              <Carousel images={product.images.slice(0, 4)} interval={3000} className="h-36 w-full rounded-lg" />
+                            </div>
+                          ) : product.images?.[0]?.url ? (
+                            <img src={product.images[0].url} alt={product.name} className="mb-3 h-36 w-full rounded-lg object-cover" />
+                          ) : (
+                            <div className="mb-3 grid h-36 place-items-center rounded-lg bg-slate-100"><Box /></div>
+                          )}
                           <h3 className="font-black">{product.name}</h3>
                           <p className={cx('text-sm', mutedText)}>{product.category}</p>
                           <strong className="mt-2 block text-violet-700">{formatCurrency(product.price)}</strong>

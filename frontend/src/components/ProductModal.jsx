@@ -1,5 +1,6 @@
 import { useEffect } from 'react'
 import { CalendarDays, Heart, MessageCircle, Package, ShoppingCart, Store, University, X } from 'lucide-react'
+import Carousel from '../components/Carousel'
 import { useTheme } from '../context/ThemeContext'
 import { useAuth } from '../context/AuthContext'
 import { useGetCartQuery, useUpdateCartMutation, useGetFavoritesQuery, useUpdateFavoritesMutation } from '../redux/slices/cartFavoritesApiSlice'
@@ -34,6 +35,7 @@ export default function ProductModal({ product, onClose, showNotification }) {
   const productId = product._id || product.id
   const isInCart = cart.some((item) => String(item._id || item.id) === String(productId))
   const isInFavorites = favorites.some((item) => String(item._id || item.id) === String(productId))
+  const imageSlides = product.images?.length ? product.images.slice(0, 4) : []
   const media = product.images?.[0]?.url || product.media
   const video = product.videos?.[0]?.url || (product.mediaType?.startsWith('video/') ? product.media : '')
   const socialLink = product.vendorSocialLink?.trim() || '#'
@@ -107,6 +109,8 @@ export default function ProductModal({ product, onClose, showNotification }) {
             <video className="h-full w-full object-cover" controls>
               <source src={video} />
             </video>
+          ) : imageSlides.length > 1 ? (
+            <Carousel images={imageSlides} interval={3000} className="h-full w-full" />
           ) : media ? (
             <img src={media} className="h-full w-full object-cover" alt={product.name} />
           ) : (

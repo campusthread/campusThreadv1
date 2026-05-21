@@ -7,7 +7,7 @@ import NotificationToast from '../components/NotificationToast'
 import { useTheme } from '../context/ThemeContext'
 import { useNotification } from '../hooks/useNotification'
 import { useAuth } from '../context/AuthContext'
-import { useGetUserOrdersQuery, useGetVendorOrdersQuery } from '../redux/slices/orderApiSlice'
+import { useGetVendorOrdersQuery, useLazyGetUserOrdersQuery } from '../redux/slices/orderApiSlice'
 
 const NAV_LINKS = [
   { path: '/shop', label: 'Shop' },
@@ -17,6 +17,16 @@ const NAV_LINKS = [
 ]
 
 const cx = (...classes) => classes.filter(Boolean).join(' ')
+
+const formatCurrency = (value) => new Intl.NumberFormat('en-NG', { style: 'currency', currency: 'NGN', maximumFractionDigits: 0 }).format(Number(value || 0))
+
+const getVendorItems = (order, vendorId) => {
+  if (!order?.items || !vendorId) return order?.items || []
+  return order.items.filter((item) => {
+    const itemVendor = item.vendor?._id || item.vendor
+    return String(itemVendor) === String(vendorId)
+  })
+}
 
 export default function OrderHistory() {
   const { theme } = useTheme()
@@ -28,10 +38,17 @@ export default function OrderHistory() {
   const [error, setError] = useState(null)
   const isVendor = user?.role === 'vendor'
   const vendorQuery = useGetVendorOrdersQuery(undefined, { skip: !isVendor })
-  const userQuery = useGetUserOrdersQuery(undefined, { skip: isVendor || !user })
+  const [triggerUserOrders, userQuery] = useLazyGetUserOrdersQuery()
   const pageClass = isDark ? 'bg-slate-950 text-slate-100' : 'bg-slate-50 text-slate-950'
   const surfaceClass = isDark ? 'border-white/10 bg-slate-900 text-slate-100 shadow-black/30' : 'border-slate-200 bg-white text-slate-950 shadow-slate-200/70'
   const mutedText = isDark ? 'text-slate-300' : 'text-slate-600'
+
+  // Trigger user orders fetch once auth/user is available
+  useEffect(() => {
+    if (!isVendor && user) {
+      triggerUserOrders()
+    }
+  }, [isVendor, user, triggerUserOrders])
 
   useEffect(() => {
     const response = isVendor ? vendorQuery.data : userQuery.data
@@ -45,7 +62,7 @@ export default function OrderHistory() {
       return
     }
     if (requestError) setError(requestError?.data?.message || requestError?.error || 'Unable to load orders')
-  }, [isVendor, userQuery.data, userQuery.error, userQuery.isFetching, vendorQuery.data, vendorQuery.error, vendorQuery.isFetching])
+  }, [isVendor, userQuery.data, userQuery.error, userQuery.isFetching, vendorQuery.data, vendorQuery.error, vendorQuery.isFetching, user])
 
   return (
     <div className={cx('min-h-screen transition-colors duration-300', pageClass)}>
@@ -80,7 +97,7 @@ export default function OrderHistory() {
                 <table className="w-full min-w-[720px] text-left text-sm">
                   <thead className={isDark ? 'bg-slate-950' : 'bg-slate-100'}>
                     <tr>
-                      {['Order', 'Product', 'Amount', 'Status', 'Payment', 'Date / Time'].map((head) => (
+                      {['Order', 'Product', ...(isVendor ? ['Customer'] : []), 'Amount', 'Status', 'Payment', 'Date / Time'].map((head) => (
                         <th key={head} className="px-5 py-4 font-black">{head}</th>
                       ))}
                     </tr>
@@ -90,13 +107,17 @@ export default function OrderHistory() {
                       const created = new Date(order.createdAt)
                       const dateText = created.toLocaleDateString()
                       const timeText = created.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-                      const productNames = order.items?.map((item) => item.name).filter(Boolean)
+                      const vendorItems = isVendor ? getVendorItems(order, user?._id) : order.items || []
+                      const displayAmount = isVendor
+                        ? vendorItems.reduce((sum, item) => sum + (item.price || 0) * (item.quantity || 0), 0)
+                        : order.totalAmount || order.total || 0
+                      const productNames = vendorItems.map((item) => item.name).filter(Boolean)
 
                       return (
                         <tr key={order._id}>
                           <td className="px-5 py-4">
                             <strong>{order.orderNumber || order._id.slice(-6).toUpperCase()}</strong>
-                            <div className={cx('mt-1', mutedText)}>{order.items?.length || 0} item(s)</div>
+                            <div className={cx('mt-1', mutedText)}>{vendorItems.length || order.items?.length || 0} item(s)</div>
                           </td>
                           <td className="px-5 py-4 max-w-[240px]">
                             <div className="text-sm font-medium text-slate-800 dark:text-slate-100">
@@ -108,7 +129,14 @@ export default function OrderHistory() {
                               </div>
                             )}
                           </td>
-                          <td className="px-5 py-4 font-bold">NGN {(order.totalAmount || 0).toLocaleString()}</td>
+                          {isVendor && (
+                            <td className="px-5 py-4 max-w-[200px] text-xs text-slate-500">
+                              <div className="font-bold truncate">{order.buyer?.name || 'Unknown buyer'}</div>
+                              <div className="truncate">{order.buyer?.email || 'No email'}</div>
+                              <div className="truncate">{order.buyer?.phone || 'No phone'}</div>
+                            </td>
+                          )}
+                          <td className="px-5 py-4 font-bold">{formatCurrency(displayAmount)}</td>
                           <td className="px-5 py-4"><StatusPill value={order.status} /></td>
                           <td className="px-5 py-4">
                             <div className="font-semibold text-slate-900 dark:text-slate-100">{order.paymentMethod?.toUpperCase() || 'Paystack'}</div>

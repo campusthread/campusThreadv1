@@ -14,6 +14,7 @@ import {
   Store,
   User,
 } from 'lucide-react'
+import Carousel from '../components/Carousel'
 import Navbar from '../components/Navbar'
 import NotificationToast from '../components/NotificationToast'
 import SectionLoader from '../components/SectionLoader'
@@ -319,8 +320,9 @@ function FilterField({ label, isDark, children }) {
 }
 
 function ProductCard({ product, isDark, surfaceClass, mutedText, onView }) {
-  const imageUrl = product.images?.[0]?.url || product.media
+  const imageSlides = product.images?.length ? product.images.slice(0, 4) : []
   const videoUrl = product.videos?.[0]?.url
+  const fallbackImage = product.images?.[0]?.url || product.media
 
   return (
     <article className={cx('group flex overflow-hidden rounded-xl border shadow-lg transition hover:-translate-y-1 hover:shadow-xl', surfaceClass)}>
@@ -330,8 +332,10 @@ function ProductCard({ product, isDark, surfaceClass, mutedText, onView }) {
             <video className="h-full w-full object-cover" controls>
               <source src={videoUrl} />
             </video>
-          ) : imageUrl ? (
-            <img src={imageUrl} className="h-full w-full object-cover transition duration-300 group-hover:scale-105" alt={product.name} />
+          ) : imageSlides.length > 1 ? (
+            <Carousel images={imageSlides} interval={3000} className="h-full w-full" />
+          ) : fallbackImage ? (
+            <img src={fallbackImage} className="h-full w-full object-cover transition duration-300 group-hover:scale-105" alt={product.name} />
           ) : (
             <div className="flex items-center justify-center h-full w-full">
               <Package size={42} className={isDark ? 'text-slate-600' : 'text-slate-400'} />

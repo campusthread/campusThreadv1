@@ -50,9 +50,9 @@ export const orderApiSlice = apiSlice.injectEndpoints({
         body,
       }),
     }),
-    verifyPayment: builder.query({
-      query: (reference) => `/orders/payment/verify?reference=${reference}`,
-      providesTags: ['Order'],
+    verifyPayment: builder.mutation({
+      query: (reference) => ({ url: `/orders/payment/verify?reference=${reference}`, method: 'GET' }),
+      invalidatesTags: ['Order'],
     }),
   }),
 })
@@ -61,10 +61,11 @@ export const {
   useCreateOrderMutation,
   useGetOrderByIdQuery,
   useGetUserOrdersQuery,
+  useLazyGetUserOrdersQuery,
   useGetVendorOrdersQuery,
+  useLazyGetVendorOrdersQuery,
   useUpdateOrderStatusMutation,
   useInitializePaymentMutation,
   useInitializePaymentWithOrderMutation,
-  useVerifyPaymentQuery,
-  useLazyVerifyPaymentQuery,
+  useVerifyPaymentMutation,
 } = orderApiSlice

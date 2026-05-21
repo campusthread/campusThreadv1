@@ -1,0 +1,35 @@
+// This section should be inserted after the Order Analytics card closing (around line 576)
+// Insert before the final </div> </div> </Panel>
+
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <div className={cx('rounded-lg border p-6', isDark ? 'border-white/10 bg-slate-800' : 'border-slate-200 bg-slate-50')}>
+                      <h3 className={cx('font-bold', isDark ? 'text-violet-400' : 'text-violet-600')}>💰 Revenue Metrics</h3>
+                      <div className="mt-4 space-y-2">
+                        <div className="flex justify-between">
+                          <span className={mutedText}>Total Revenue</span>
+                          <span className="font-black text-lg">₦{Number(dashboardStats.totalRevenue || 0).toLocaleString()}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className={mutedText}>Avg Order Value</span>
+                          <span className="font-bold">₦{Number(dashboardStats.avgOrderValue || 0).toLocaleString()}</span>
+                        </div>
+                        <div className="mt-3 pt-3" style={isDark ? { borderTop: '1px solid rgba(255, 255, 255, 0.1)' } : { borderTop: '1px solid rgba(0, 0, 0, 0.1)' }}>
+                          <p className={cx('text-xs', mutedText)}>Revenue from all paid orders on the platform</p>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className={cx('rounded-lg border p-6', isDark ? 'border-white/10 bg-slate-800' : 'border-slate-200 bg-slate-50')}>
+                      <h3 className="font-bold">Catalog Statistics</h3>
+                      <div className="mt-4 space-y-2">
+                        <div className="flex justify-between">
+                          <span className={mutedText}>Total Products</span>
+                          <span className="font-bold">{dashboardStats.totalProducts || 0}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className={mutedText}>Total Brands</span>
+                          <span className="font-bold">{dashboardStats.totalBrands || 0}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>

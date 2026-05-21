@@ -8,6 +8,7 @@ import {
   ShoppingBag,
   ShoppingCart,
 } from 'lucide-react'
+import Carousel from '../components/Carousel'
 import Navbar from '../components/Navbar'
 import NotificationToast from '../components/NotificationToast'
 import { useTheme } from '../context/ThemeContext'
@@ -244,7 +245,9 @@ export default function ProductDetail() {
       <section className="grid gap-4 lg:grid-cols-[0.8fr_1.2fr] items-start">
         <div className={cx('overflow-hidden rounded-xl border shadow-lg', surfaceClass)}>
           <div className={cx('relative flex aspect-[4/3] items-center justify-center overflow-hidden bg-gradient-to-br', isDark ? 'from-slate-900 to-slate-950' : 'from-slate-50 to-slate-100')}>
-            {product.images?.[0]?.url ? (
+            {product.images?.length > 1 ? (
+              <Carousel images={product.images.slice(0, 4)} interval={3000} className="h-full w-full" />
+            ) : product.images?.[0]?.url ? (
               <img
                 src={product.images[0].url}
                 alt={product.name}
