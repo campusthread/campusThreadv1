@@ -8,6 +8,22 @@ dotenv.config({ path: envPath });
 const envOverridePath = path.resolve(process.cwd(), `.env.${process.env.NODE_ENV || "development"}`);
 dotenv.config({ path: envOverridePath });
 
+const normalizeExpiresIn = (value) => {
+  if (!value) return "30d";
+  const trimmed = value.trim();
+  const minuteMatch = trimmed.match(/^(\d+)m$/i);
+  if (minuteMatch) {
+    const minutes = Number(minuteMatch[1]);
+    if (minutes % 1440 === 0) {
+      return `${minutes / 1440}d`;
+    }
+    if (minutes % 60 === 0) {
+      return `${minutes / 60}h`;
+    }
+  }
+  return trimmed;
+};
+
 const rawEnv = {
   NODE_ENV: process.env.NODE_ENV,
   PORT: process.env.PORT,
@@ -20,7 +36,7 @@ const rawEnv = {
   REDIS_URL: process.env.REDIS_URL,
   REDIS_ENABLED: process.env.REDIS_ENABLED,
   JWT_SECRET: process.env.JWT_SECRET,
-  JWT_EXPIRES_IN: process.env.JWT_EXPIRES_IN || process.env.JWT_EXPIRE,
+  JWT_EXPIRES_IN: normalizeExpiresIn(process.env.JWT_EXPIRES_IN || process.env.JWT_EXPIRE),
   REFRESH_TOKEN_SECRET: process.env.REFRESH_TOKEN_SECRET,
   REFRESH_TOKEN_EXPIRE: process.env.REFRESH_TOKEN_EXPIRE,
   CLOUDINARY_CLOUD_NAME: process.env.CLOUDINARY_CLOUD_NAME || process.env.CLOUDINARY_NAME,
