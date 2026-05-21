@@ -38,6 +38,7 @@ export default function VendorAdmin() {
   const [profileFilePreview, setProfileFilePreview] = useState(null)
   const [products, setProducts] = useState([])
   const [orders, setOrders] = useState([])
+  const [vendorStats, setVendorStats] = useState({ totalRevenue: 0, totalOrders: 0, deliveredCount: 0, commission: 0 })
   const [editingProductId, setEditingProductId] = useState(null)
   const [productForm, setProductForm] = useState({ name: '', description: '', price: '', category: '', stock: '' })
   const [productFiles, setProductFiles] = useState([])
@@ -60,15 +61,17 @@ export default function VendorAdmin() {
     const loadData = async () => {
       try {
         setLoading(true)
-        const [profileRes, productsRes, ordersRes] = await Promise.all([
+        const [profileRes, productsRes, ordersRes, statsRes] = await Promise.all([
           vendorAPI.getProfile(),
           productAPI.getVendorProducts(),
           orderAPI.getVendorOrders(),
+          vendorAPI.getStats(),
         ])
         const vendorData = profileRes.vendor || {}
         setProfile(vendorData)
         setProducts(productsRes.products || [])
         setOrders(ordersRes.orders || [])
+        setVendorStats(statsRes.data?.stats || statsRes.stats || { totalRevenue: 0, totalOrders: 0, deliveredCount: 0, commission: 0 })
         setProfileForm({
           brandName: vendorData.brandName || '',
           brandDescription: vendorData.brandDescription || '',
@@ -94,10 +97,11 @@ export default function VendorAdmin() {
     const pendingOrders = orders.filter((order) => order.status === 'pending').length
     return [
       { label: 'Products live', value: products.length },
-      { label: 'Orders', value: orders.length },
+      { label: 'Paid orders', value: vendorStats.totalOrders || paidOrders.length },
+      { label: 'Total revenue', value: formatCurrency(vendorStats.totalRevenue || 0) },
       { label: 'Pending', value: pendingOrders },
     ]
-  }, [orders, products])
+  }, [orders, products, vendorStats])
 
   const getVendorOrderItems = (order) => {
     const vendorId = user?._id || user?.id
@@ -349,9 +353,33 @@ export default function VendorAdmin() {
               </section>
 
               {activeTab === 'dashboard' && (
-                <section className="grid gap-6 xl:grid-cols-2">
-                  <Panel title="Recent Products" surfaceClass={surfaceClass}>
-                    <List products={products.slice(0, 5)} empty="No products yet." render={(product) => (
+                <>
+                  <section className="mb-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                    <Panel title="Store Revenue" surfaceClass={surfaceClass}>
+                      <div className="space-y-3">
+                        <p className={cx('text-sm font-semibold uppercase tracking-[0.2em] text-violet-700')}>Total revenue</p>
+                        <p className="text-4xl font-black tracking-tight">{formatCurrency(vendorStats.totalRevenue)}</p>
+                        <p className={cx('text-sm', mutedText)}>Revenue from paid orders for your store.</p>
+                      </div>
+                    </Panel>
+                    <Panel title="Platform Commission" surfaceClass={surfaceClass}>
+                      <div className="space-y-3">
+                        <p className={cx('text-sm font-semibold uppercase tracking-[0.2em] text-violet-700')}>Commission earned</p>
+                        <p className="text-4xl font-black tracking-tight">{formatCurrency(vendorStats.commission)}</p>
+                        <p className={cx('text-sm', mutedText)}>Estimated platform commission on your paid orders.</p>
+                      </div>
+                    </Panel>
+                    <Panel title="Paid Orders" surfaceClass={surfaceClass}>
+                      <div className="space-y-3">
+                        <p className={cx('text-sm font-semibold uppercase tracking-[0.2em] text-violet-700')}>Paid orders</p>
+                        <p className="text-4xl font-black tracking-tight">{vendorStats.totalOrders}</p>
+                        <p className={cx('text-sm', mutedText)}>Orders with completed payment.</p>
+                      </div>
+                    </Panel>
+                  </section>
+                  <section className="grid gap-6 xl:grid-cols-2">
+                    <Panel title="Recent Products" surfaceClass={surfaceClass}>
+                      <List products={products.slice(0, 5)} empty="No products yet." render={(product) => (
                       <button key={product._id} type="button" onClick={() => handleStartEditProduct(product)} className={cx('flex w-full items-center justify-between rounded-xl border p-4 text-left', softClass)}>
                         <span><strong>{product.name}</strong><small className={cx('block', mutedText)}>{formatCurrency(product.price)} / {product.stock} in stock</small></span>
                         <Box size={18} />
