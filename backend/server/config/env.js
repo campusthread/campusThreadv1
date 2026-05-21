@@ -1,7 +1,12 @@
 import dotenv from "dotenv";
+import path from "node:path";
 import { z } from "zod";
 
-dotenv.config();
+const envPath = path.resolve(process.cwd(), ".env");
+dotenv.config({ path: envPath });
+
+const envOverridePath = path.resolve(process.cwd(), `.env.${process.env.NODE_ENV || "development"}`);
+dotenv.config({ path: envOverridePath });
 
 const rawEnv = {
   NODE_ENV: process.env.NODE_ENV,
