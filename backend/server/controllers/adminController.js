@@ -31,6 +31,7 @@ const buildDashboardStats = async () => {
 
   const totalRevenue = orderRevenue[0]?.total || 0;
   const avgOrderValue = totalPaidOrders > 0 ? totalRevenue / totalPaidOrders : 0;
+  const serviceCommission = Number((totalRevenue * 0.1).toFixed(2));
 
   return {
     totalUsers,
@@ -40,6 +41,7 @@ const buildDashboardStats = async () => {
     totalOrders,
     totalRevenue,
     avgOrderValue,
+    serviceCommission,
     activeUsers30d,
     newUsers7d,
   };

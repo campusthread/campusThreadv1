@@ -156,7 +156,7 @@ export const initializePayment = async (req, res) => {
       email: req.body.email || req.user?.email,
       amount: Math.round((order.totalAmount || 0) * 100),
       reference,
-      callback_url: `${callbackBase.replace(/\/+$/,'')}/payment-success?reference=${reference}`,
+      callback_url: `${callbackBase.replace(/\/+$/, '')}/payment-success?reference=${reference}`,
     };
 
     const resp = await fetch('https://api.paystack.co/transaction/initialize', {
@@ -242,7 +242,7 @@ export const initializePaymentWithOrder = async (req, res) => {
       email: req.body.email || req.user?.email,
       amount: Math.round(totalAmount * 100),
       reference,
-      callback_url: `${callbackBase.replace(/\/+$/,'')}/payment-success?reference=${reference}`,
+      callback_url: `${callbackBase.replace(/\/+$/, '')}/payment-success?reference=${reference}`,
       metadata,
     };
 

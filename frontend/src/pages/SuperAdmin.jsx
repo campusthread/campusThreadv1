@@ -336,7 +336,7 @@ export default function SuperAdmin() {
                           <p className={cx('text-xs', mutedText)}>Total Revenue (All Paid Orders)</p>
                           <p className="mt-1 text-4xl font-black">₦{Number(dashboardStats.totalRevenue || 0).toLocaleString()}</p>
                         </div>
-                        <div className="grid grid-cols-2 gap-4">
+                        <div className="grid gap-4 sm:grid-cols-3">
                           <div>
                             <p className={cx('text-xs', mutedText)}>Paid Orders</p>
                             <p className="mt-1 text-2xl font-bold">{dashboardStats.totalOrders || 0}</p>
@@ -344,6 +344,10 @@ export default function SuperAdmin() {
                           <div>
                             <p className={cx('text-xs', mutedText)}>Avg per Order</p>
                             <p className="mt-1 text-2xl font-bold">₦{Number(dashboardStats.avgOrderValue || 0).toLocaleString()}</p>
+                          </div>
+                          <div>
+                            <p className={cx('text-xs', mutedText)}>Service Commission (10%)</p>
+                            <p className="mt-1 text-2xl font-bold">₦{Number(dashboardStats.serviceCommission || 0).toLocaleString()}</p>
                           </div>
                         </div>
                       </div>
