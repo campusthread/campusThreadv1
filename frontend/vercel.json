@@ -2,12 +2,19 @@
     "version": 2,
     "routes": [
         {
+            "src": "/api/(.*)",
+            "dest": "https://campusthreadv1.onrender.com/api/$1"
+        },
+        {
             "src": "/api",
             "dest": "https://campusthreadv1.onrender.com/api"
         },
         {
-            "src": "/api/(.*)",
-            "dest": "https://campusthreadv1.onrender.com/api/$1"
+            "handle": "filesystem"
+        },
+        {
+            "src": "/(.*)",
+            "dest": "/index.html"
         }
     ]
 }

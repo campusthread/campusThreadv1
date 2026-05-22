@@ -266,7 +266,7 @@ export default function Home() {
                     <div className="absolute inset-0 bg-gradient-to-t from-slate-950/85 via-slate-950/20 to-transparent" />
                     <div className="absolute inset-x-0 bottom-0 p-6 text-white">
                       <p className="mb-2 inline-flex rounded-full bg-white/15 px-3 py-1 text-xs font-bold uppercase tracking-wide backdrop-blur">
-                        Sponsored
+                        Ads
                       </p>
                       <h2 className="text-2xl font-black tracking-normal">{currentAd.title}</h2>
                       <p className="mt-2 line-clamp-2 text-sm leading-6 text-slate-100">{currentAd.description}</p>
