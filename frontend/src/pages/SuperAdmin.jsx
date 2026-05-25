@@ -429,6 +429,8 @@ export default function SuperAdmin() {
                   <div className="space-y-4 sm:hidden">
                     {orders.map((order) => {
                       const totalQty = order.items?.reduce((sum, item) => sum + (item.quantity || 0), 0) || 0
+                      const commission = Number(order.totalAmount || 0) * 0.10
+                      const vendorPayout = Number(order.totalAmount || 0) - commission
                       return (
                         <div key={order._id} className={cx('rounded-3xl border p-4 shadow-sm', surfaceClass)}>
                           <div className="flex flex-wrap items-center justify-between gap-2">
@@ -440,16 +442,32 @@ export default function SuperAdmin() {
                               <span className="font-semibold">Buyer:</span> {order.buyer?.name || order.buyer?.email || 'Unknown'}
                             </div>
                             <div>
-                              <span className="font-semibold">Amount:</span> ₦{Number(order.totalAmount || order.total || 0).toLocaleString()}
+                              <span className="font-semibold">Items:</span>
+                              <div className="ml-2 mt-1 space-y-1">
+                                {order.items?.map((item, idx) => (
+                                  <div key={`${item.product || item.name}-${idx}`} className="text-slate-500">
+                                    {item.name} ×{item.quantity}
+                                    <div className="ml-2 text-xs text-slate-400 italic">
+                                      by {item.vendor?.storeName || item.vendor?.name || 'Unknown vendor'}
+                                    </div>
+                                  </div>
+                                )) || 'No items'}
+                              </div>
+                            </div>
+                            <div>
+                              <span className="font-semibold">Total:</span> ₦{Number(order.totalAmount || order.total || 0).toLocaleString()}
+                            </div>
+                            <div>
+                              <span className="font-semibold">Commission (10%):</span> ₦{commission.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                            </div>
+                            <div>
+                              <span className="font-semibold">Vendor Payout:</span> ₦{vendorPayout.toLocaleString(undefined, { maximumFractionDigits: 0 })}
                             </div>
                             <div>
                               <span className="font-semibold">Status:</span> {humanizeStatus(order.status)}
                             </div>
                             <div>
                               <span className="font-semibold">Payment:</span> {order.paymentMethod || 'Unknown'} / {order.paymentStatus || 'pending'}
-                            </div>
-                            <div>
-                              <span className="font-semibold">Items:</span> {order.items?.map((item) => `${item.name}×${item.quantity}`).join(', ') || 'No items'}
                             </div>
                             <div>
                               <span className="font-semibold">Ship to:</span> {order.shippingAddress?.name || 'No name'}, {order.shippingAddress?.city || ''}{order.shippingAddress?.city && order.shippingAddress?.state ? ', ' : ''}{order.shippingAddress?.state || ''}
@@ -461,59 +479,61 @@ export default function SuperAdmin() {
                   </div>
 
                   <div className="hidden sm:block overflow-x-auto">
-                    <table className="min-w-[900px] w-full table-auto text-left text-xs">
-                      <colgroup>
-                        <col style={{ width: '8%' }} />
-                        <col style={{ width: '18%' }} />
-                        <col style={{ width: '18%' }} />
-                        <col style={{ width: '6%' }} />
-                        <col style={{ width: '20%' }} />
-                        <col style={{ width: '10%' }} />
-                        <col style={{ width: '10%' }} />
-                        <col style={{ width: '10%' }} />
-                        <col style={{ width: '10%' }} />
-                      </colgroup>
+                    <table className="min-w-full table-auto text-left text-xs">
                       <thead className={isDark ? 'bg-slate-950' : 'bg-slate-100'}>
                         <tr>
-                          {['Order', 'Buyer', 'Items', 'Qty', 'Ship', 'Amt', 'Pay', 'Status', 'Date'].map((head) => <th key={head} className="px-3 py-2 font-black whitespace-normal break-words">{head}</th>)}
+                          {['Order', 'Buyer', 'Items', 'Qty', 'Ship', 'Total', 'Commission (10%)', 'Vendor Payout', 'Pay', 'Status', 'Date'].map((head) => <th key={head} className="px-3 py-3 font-black whitespace-nowrap">{head}</th>)}
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-200 dark:divide-white/10">
                         {orders.map((order) => {
                           const totalQty = order.items?.reduce((sum, item) => sum + (item.quantity || 0), 0) || 0
+                          const commission = Number(order.totalAmount || 0) * 0.10
+                          const vendorPayout = Number(order.totalAmount || 0) - commission
                           return (
-                            <tr key={order._id}>
+                            <tr key={order._id} className={isDark ? 'hover:bg-slate-800/50' : 'hover:bg-slate-50'}>
                               <td className="px-3 py-2 font-bold text-xs">#{order._id.slice(-6).toUpperCase()}</td>
-                              <td className="px-3 py-2 max-w-[160px] whitespace-normal text-xs">
+                              <td className="px-3 py-2 max-w-[140px] text-xs">
                                 <div className="font-bold truncate">{order.buyer?.name || 'Unknown buyer'}</div>
                                 <div className="truncate text-slate-500">{order.buyer?.email}</div>
                                 <div className="truncate text-slate-500">{order.buyer?.phone || 'No phone'}</div>
                               </td>
-                              <td className="px-3 py-2 max-w-[180px] whitespace-normal text-xs text-slate-500">
+                              <td className="px-3 py-2 max-w-[160px] whitespace-normal text-xs text-slate-500">
                                 <div className="space-y-1">
                                   {order.items?.map((item, idx) => (
-                                    <div key={`${item.product || item.name}-${idx}`}>{item.name} ×{item.quantity}</div>
+                                    <div key={`${item.product || item.name}-${idx}`} className="flex flex-col gap-0.5">
+                                      <div>{item.name} ×{item.quantity}</div>
+                                      <div className="text-xs text-slate-400 italic">
+                                        {item.vendor?.storeName || item.vendor?.name || 'Unknown vendor'}
+                                      </div>
+                                    </div>
                                   ))}
                                 </div>
                               </td>
-                              <td className="px-4 py-3">{totalQty}</td>
-                              <td className="px-3 py-2 max-w-[180px] whitespace-normal text-xs">
+                              <td className="px-3 py-2 text-xs font-bold">{totalQty}</td>
+                              <td className="px-3 py-2 max-w-[120px] whitespace-normal text-xs">
                                 <div className="font-bold truncate">{order.shippingAddress?.name || 'No name'}</div>
-                                <div className="truncate text-slate-500">{order.shippingAddress?.address || 'No address'}</div>
-                                <div className="truncate text-slate-500">{[order.shippingAddress?.city, order.shippingAddress?.state, order.shippingAddress?.zipCode].filter(Boolean).join(', ')}</div>
+                                <div className="truncate text-slate-500">{order.shippingAddress?.city || ''} {order.shippingAddress?.state || ''}</div>
                               </td>
-                              <td className="px-3 py-2 text-xs">₦{Number(order.totalAmount || order.total || 0).toLocaleString()}</td>
+                              <td className="px-3 py-2 text-xs font-bold text-violet-700 dark:text-violet-400">₦{Number(order.totalAmount || order.total || 0).toLocaleString()}</td>
+                              <td className="px-3 py-2 text-xs font-bold text-amber-600 dark:text-amber-400">₦{commission.toLocaleString(undefined, { maximumFractionDigits: 0 })}</td>
+                              <td className="px-3 py-2 text-xs font-bold text-emerald-600 dark:text-emerald-400">₦{vendorPayout.toLocaleString(undefined, { maximumFractionDigits: 0 })}</td>
                               <td className="px-3 py-2 text-xs">
                                 <div className="font-bold truncate">{order.paymentMethod || 'Unknown'}</div>
                                 <div className="truncate text-slate-500">{order.paymentStatus || 'pending'}</div>
                               </td>
-                              <td className="px-4 py-3">{humanizeStatus(order.status)}</td>
-                              <td className="px-4 py-3">{new Date(order.createdAt).toLocaleDateString()}</td>
+                              <td className="px-3 py-2 text-xs">{humanizeStatus(order.status)}</td>
+                              <td className="px-3 py-2 text-xs whitespace-nowrap">{new Date(order.createdAt).toLocaleDateString()}</td>
                             </tr>
                           )
                         })}
                       </tbody>
                     </table>
+                  </div>
+                  <div className="mt-4 text-xs text-slate-500 dark:text-slate-400">
+                    <p>Total Orders: <strong>{orders.length}</strong></p>
+                    <p className="mt-1">Total Revenue: <strong className="text-violet-600 dark:text-violet-400">₦{orders.reduce((sum, order) => sum + (Number(order.totalAmount || 0)), 0).toLocaleString()}</strong></p>
+                    <p>Platform Commission (10%): <strong className="text-amber-600 dark:text-amber-400">₦{(orders.reduce((sum, order) => sum + (Number(order.totalAmount || 0)), 0) * 0.10).toLocaleString(undefined, { maximumFractionDigits: 0 })}</strong></p>
                   </div>
                 </>
               )}

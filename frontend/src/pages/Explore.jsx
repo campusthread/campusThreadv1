@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Building2, Inbox, Package, Store, University } from 'lucide-react'
+import { Building2, Inbox, Package, Store, University, Search, X } from 'lucide-react'
 import Carousel from '../components/Carousel'
 import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
@@ -39,6 +39,8 @@ export default function Explore() {
     : []
   const safeBrands = Array.from(new Set([...brandNamesFromBrands, ...brandNamesFromProducts])).sort()
   const brandProducts = currentBrand ? productsData.filter((product) => product.brand === currentBrand) : []
+  const [searchBrand, setSearchBrand] = useState('')
+  const filteredBrands = safeBrands.filter((brand) => brand.toLowerCase().includes(searchBrand.toLowerCase()))
   const pageClass = isDark ? 'bg-slate-950 text-slate-100' : 'bg-slate-50 text-slate-950'
   const surfaceClass = isDark ? 'border-white/10 bg-slate-900 text-slate-100 shadow-black/30' : 'border-slate-200 bg-white text-slate-950 shadow-slate-200/70'
   const mutedText = isDark ? 'text-slate-300' : 'text-slate-600'
@@ -77,24 +79,49 @@ export default function Explore() {
 
             <section className={cx('mt-10 rounded-2xl border p-5 shadow-lg', surfaceClass)}>
               <label className="text-sm font-black uppercase tracking-wide">Filter by Brand</label>
+              <div className="mt-4 flex gap-3">
+                <div className={cx('relative flex-1 rounded-lg border transition', isDark ? 'border-white/20 bg-slate-800' : 'border-slate-300 bg-white')}>
+                  <Search size={18} className={cx('absolute left-3 top-1/2 -translate-y-1/2', isDark ? 'text-slate-400' : 'text-slate-500')} />
+                  <input
+                    type="text"
+                    placeholder="Search brands..."
+                    value={searchBrand}
+                    onChange={(e) => setSearchBrand(e.target.value)}
+                    className={cx('w-full rounded-lg bg-transparent py-2 pl-10 pr-10 text-sm font-bold outline-none transition', isDark ? 'text-slate-100 placeholder-slate-500' : 'text-slate-950 placeholder-slate-400')}
+                  />
+                  {searchBrand && (
+                    <button
+                      type="button"
+                      onClick={() => setSearchBrand('')}
+                      className={cx('absolute right-3 top-1/2 -translate-y-1/2 rounded p-1 transition', isDark ? 'hover:bg-slate-700' : 'hover:bg-slate-200')}
+                    >
+                      <X size={16} />
+                    </button>
+                  )}
+                </div>
+              </div>
               <div className="mt-4 flex gap-3 overflow-x-auto pb-2">
-                {safeBrands.map((brand) => (
-                  <button
-                    key={brand}
-                    type="button"
-                    onClick={() => setCurrentBrand(brand)}
-                    className={cx(
-                      'shrink-0 rounded-full border px-5 py-2 text-sm font-bold uppercase tracking-wide transition',
-                      currentBrand === brand
-                        ? 'border-violet-700 bg-violet-700 text-white'
-                        : isDark
-                          ? 'border-violet-300/40 text-violet-100 hover:bg-violet-300/10'
-                          : 'border-violet-700 text-violet-700 hover:bg-violet-50',
-                    )}
-                  >
-                    {brand}
-                  </button>
-                ))}
+                {filteredBrands.length > 0 ? (
+                  filteredBrands.map((brand) => (
+                    <button
+                      key={brand}
+                      type="button"
+                      onClick={() => setCurrentBrand(brand)}
+                      className={cx(
+                        'shrink-0 rounded-full border px-5 py-2 text-sm font-bold uppercase tracking-wide transition',
+                        currentBrand === brand
+                          ? 'border-violet-700 bg-violet-700 text-white'
+                          : isDark
+                            ? 'border-violet-300/40 text-violet-100 hover:bg-violet-300/10'
+                            : 'border-violet-700 text-violet-700 hover:bg-violet-50',
+                      )}
+                    >
+                      {brand}
+                    </button>
+                  ))
+                ) : (
+                  <p className={cx('py-2 text-sm', mutedText)}>No brands found matching "{searchBrand}"</p>
+                )}
               </div>
             </section>
 
