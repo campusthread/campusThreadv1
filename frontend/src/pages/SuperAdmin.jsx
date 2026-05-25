@@ -20,6 +20,7 @@ const sections = [
   { key: 'brands', icon: Tags, label: 'Brands' },
   { key: 'categories', icon: List, label: 'Categories' },
   { key: 'ads', icon: Megaphone, label: 'Ads' },
+  { key: 'reminders', icon: Megaphone, label: 'Reminders' },
   { key: 'debug', icon: Terminal, label: 'Debug Console' },
 ]
 
@@ -47,6 +48,8 @@ export default function SuperAdmin() {
   const [adImageFile, setAdImageFile] = useState(null)
   const adFileRef = useRef(null)
   const [confirmDialog, setConfirmDialog] = useState({ open: false, title: '', description: '', confirmLabel: 'Delete', cancelLabel: 'Cancel', onConfirm: null, loading: false })
+  const [reminderForm, setReminderForm] = useState({ audience: 'all', headline: '', message: '', ctaUrl: '' })
+  const [sendingReminders, setSendingReminders] = useState(false)
 
   // Fetch from API instead of localStorage
   const { data: productsData = [], isLoading: productsLoading, isError: productsError } = useGetProductsQuery()
@@ -980,6 +983,104 @@ export default function SuperAdmin() {
                   </div>
                 </>
               )}
+            </Panel>
+          )}
+
+          {section === 'reminders' && (
+            <Panel title="Send Reminder Emails" surfaceClass={surfaceClass}>
+              <div className="space-y-6">
+                <div className={cx('rounded-lg border p-4', isDark ? 'border-amber-500/20 bg-amber-900/20' : 'border-amber-200 bg-amber-50')}>
+                  <p className={cx('text-sm', isDark ? 'text-amber-200' : 'text-amber-700')}>💌 Send friendly reminder emails to users based on their role. Vendors will be reminded to upload products, buyers to shop for new items.</p>
+                </div>
+
+                <form onSubmit={async (e) => {
+                  e.preventDefault()
+                  if (!reminderForm.headline.trim()) {
+                    showAlert('Please enter a headline', 'warning')
+                    return
+                  }
+                  if (!reminderForm.message.trim()) {
+                    showAlert('Please enter a message', 'warning')
+                    return
+                  }
+                  try {
+                    setSendingReminders(true)
+                    const response = await fetch('/api/admin/reminders', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      credentials: 'include',
+                      body: JSON.stringify(reminderForm),
+                    })
+                    if (!response.ok) {
+                      const data = await response.json()
+                      throw new Error(data.message || 'Failed to send reminders')
+                    }
+                    const data = await response.json()
+                    showAlert(`Reminders sent to ${data.data?.successCount || 0} users!`, 'success')
+                    setReminderForm({ audience: 'all', headline: '', message: '', ctaUrl: '' })
+                  } catch (err) {
+                    showAlert(err?.message || 'Failed to send reminders', 'error')
+                  } finally {
+                    setSendingReminders(false)
+                  }
+                }} className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-bold mb-2">Send To:</label>
+                    <select value={reminderForm.audience} onChange={(e) => setReminderForm({ ...reminderForm, audience: e.target.value })} className={inputClass}>
+                      <option value="all">All Users (Vendors + Buyers)</option>
+                      <option value="vendors">Vendors Only</option>
+                      <option value="buyers">Buyers Only</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-bold mb-2">Email Headline:</label>
+                    <input type="text" value={reminderForm.headline} onChange={(e) => setReminderForm({ ...reminderForm, headline: e.target.value })} placeholder="e.g., Fresh Campus Deals are Waiting" className={inputClass} />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-bold mb-2">Email Message:</label>
+                    <textarea value={reminderForm.message} onChange={(e) => setReminderForm({ ...reminderForm, message: e.target.value })} placeholder="Write a friendly, engaging message for users..." rows="4" className={inputClass} />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-bold mb-2">CTA URL (Optional):</label>
+                    <input type="url" value={reminderForm.ctaUrl} onChange={(e) => setReminderForm({ ...reminderForm, ctaUrl: e.target.value })} placeholder="https://campus-threadv1.vercel.app/shop" className={inputClass} />
+                    <p className={cx('text-xs mt-1', mutedText)}>Leave blank for default redirect (Shop for buyers, Vendor Dashboard for vendors)</p>
+                  </div>
+
+                  <div className="flex gap-3 pt-4">
+                    <button type="submit" disabled={sendingReminders} className={cx('flex-1 inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-bold text-white transition', sendingReminders ? 'bg-slate-400 cursor-not-allowed' : 'bg-violet-700 hover:bg-violet-800')}>
+                      {sendingReminders ? (
+                        <>
+                          <Loader2 size={16} className="animate-spin" /> Sending...
+                        </>
+                      ) : (
+                        <>
+                          <Megaphone size={16} /> Send Reminders
+                        </>
+                      )}
+                    </button>
+                    <button type="button" onClick={() => setReminderForm({ audience: 'all', headline: '', message: '', ctaUrl: '' })} className={cx('rounded-lg border px-4 py-2 text-sm font-bold', isDark ? 'border-white/10' : 'border-slate-200')}>
+                      Reset
+                    </button>
+                  </div>
+                </form>
+
+                <div className={cx('rounded-lg border p-4', isDark ? 'border-slate-700 bg-slate-800/50' : 'border-slate-200 bg-slate-100/50')}>
+                  <h3 className="font-bold mb-3">Preview Templates:</h3>
+                  <div className="space-y-4 text-sm">
+                    <div>
+                      <p className="font-semibold text-amber-600 dark:text-amber-400">For Vendors:</p>
+                      <p className={mutedText}>Upload new products and boost your CampusThread sales</p>
+                    </div>
+                    <div>
+                      <p className="font-semibold text-emerald-600 dark:text-emerald-400">For Buyers:</p>
+                      <p className={mutedText}>New deals and campus picks just for you</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </Panel>
           )}
         </main>
