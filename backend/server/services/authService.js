@@ -85,7 +85,7 @@ const sanitizeUser = (user) => ({
 
 export const getAuthCookieOptions = () => ({
   httpOnly: true,
-  sameSite: "lax",
+  sameSite: env.isProduction ? 'none' : 'lax',
   secure: env.isProduction,
   maxAge: 7 * 24 * 60 * 60 * 1000,
 });

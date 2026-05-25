@@ -38,9 +38,13 @@ export const productApiSlice = apiSlice.injectEndpoints({
       invalidatesTags: (result, error, id) => [{ type: 'Product', id }, 'Product'],
     }),
     uploadProductMedia: builder.mutation({
-      query: ({ productId, file }) => {
+      query: ({ productId, files }) => {
         const formData = new FormData()
-        formData.append('media', file)
+        if (Array.isArray(files)) {
+          files.forEach((file) => formData.append('media', file))
+        } else if (files) {
+          formData.append('media', files)
+        }
 
         return {
           url: `/products/${productId}/media`,

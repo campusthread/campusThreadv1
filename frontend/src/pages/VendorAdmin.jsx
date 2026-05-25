@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from 'react'
-import { Box, Eye, EyeOff, ImagePlus, LayoutDashboard, LogOut, Menu, PackagePlus, Receipt, Save, Settings2, ShoppingBag, Store, Trash2, TrendingUp, UserCircle2, X } from 'lucide-react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { Box, Eye, EyeOff, ImagePlus, LayoutDashboard, LogOut, Menu, PackagePlus, Receipt, RotateCcw, Save, Settings2, ShoppingBag, Store, Trash2, TrendingUp, UserCircle2, X } from 'lucide-react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useTheme } from '../context/ThemeContext'
 import Carousel from '../components/Carousel'
@@ -7,6 +7,8 @@ import { useAuth } from '../context/AuthContext'
 import ConfirmModal from '../components/ConfirmModal'
 import SectionLoader from '../components/SectionLoader'
 import { orderAPI, productAPI, vendorAPI } from '../utils/api'
+import { useCreateProductMutation, useDeleteProductMutation, useUpdateProductMutation, useUploadProductMediaMutation } from '../redux/slices/productApiSlice'
+import { useGetCategoriesQuery } from '../redux/slices/categoryApiSlice'
 
 const tabs = [
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -15,7 +17,7 @@ const tabs = [
   { id: 'orders', label: 'Orders', icon: Receipt },
 ]
 
-const productCategories = ['hoodies', 'tshirts', 'caps', 'jackets', 'accessories']
+const fallbackProductCategories = ['hoodies', 'tshirts', 'caps', 'jackets', 'accessories']
 const cx = (...classes) => classes.filter(Boolean).join(' ')
 const formatCurrency = (value) => new Intl.NumberFormat('en-NG', { style: 'currency', currency: 'NGN', maximumFractionDigits: 0 }).format(Number(value || 0))
 const humanizeStatus = (status) => (status || 'pending').replace(/_/g, ' ').replace(/\b\w/g, (char) => char.toUpperCase())
@@ -44,6 +46,16 @@ export default function VendorAdmin() {
   const [productFiles, setProductFiles] = useState([])
   const [productFilePreviews, setProductFilePreviews] = useState([])
   const [confirmDialog, setConfirmDialog] = useState({ open: false, title: '', description: '', confirmLabel: 'Delete', cancelLabel: 'Cancel', onConfirm: null, loading: false })
+  const fileInputRef = useRef(null)
+  const [createProduct, { isLoading: creatingProduct }] = useCreateProductMutation()
+  const [updateProduct, { isLoading: updatingProduct }] = useUpdateProductMutation()
+  const [uploadProductMedia, { isLoading: uploadingMedia }] = useUploadProductMediaMutation()
+  const [deleteProduct] = useDeleteProductMutation()
+  const { data: categoriesData = [] } = useGetCategoriesQuery()
+  const categoryOptions = useMemo(
+    () => Array.isArray(categoriesData) && categoriesData.length > 0 ? categoriesData.map((category) => category.name) : fallbackProductCategories,
+    [categoriesData],
+  )
 
   const pageClass = isDark ? 'bg-slate-950 text-slate-100' : 'bg-slate-50 text-slate-950'
   const surfaceClass = isDark ? 'border-white/10 bg-slate-900 text-slate-100 shadow-black/30' : 'border-slate-200 bg-white text-slate-950 shadow-slate-200/70'
@@ -191,11 +203,11 @@ export default function VendorAdmin() {
       const payload = { ...productForm, price: Number(productForm.price), stock: Number(productForm.stock) }
       const isEditing = Boolean(editingProductId && editingProductId !== 'new')
       let resultProduct = isEditing
-        ? (await productAPI.update(editingProductId, payload)).product
-        : (await productAPI.create(payload)).product
+        ? (await updateProduct({ id: editingProductId, ...payload }).unwrap()).product
+        : (await createProduct(payload).unwrap()).product
 
       if (productFiles.length && resultProduct?._id) {
-        const uploadResult = await productAPI.uploadMedia(resultProduct._id, productFiles)
+        const uploadResult = await uploadProductMedia({ productId: resultProduct._id, files: productFiles }).unwrap()
         resultProduct = uploadResult.product || resultProduct
       }
 
@@ -487,8 +499,50 @@ export default function VendorAdmin() {
                         <Field label="Price"><input type="number" min="0" value={productForm.price} onChange={(event) => setProductForm({ ...productForm, price: event.target.value })} required className={inputClass} /></Field>
                         <Field label="Stock"><input type="number" min="0" value={productForm.stock} onChange={(event) => setProductForm({ ...productForm, stock: event.target.value })} required className={inputClass} /></Field>
                       </div>
-                      <Field label="Category"><select value={productForm.category} onChange={(event) => setProductForm({ ...productForm, category: event.target.value })} required className={inputClass}><option value="">Select category</option>{productCategories.map((category) => <option key={category} value={category}>{category}</option>)}</select></Field>
-                      <input type="file" accept="image/*" multiple onChange={handleProductFileSelect} className="text-sm" />
+                      <Field label="Category">
+                        <select value={productForm.category} onChange={(event) => setProductForm({ ...productForm, category: event.target.value })} required className={inputClass}>
+                          <option value="">Select category</option>
+                          {categoryOptions.map((category) => (
+                            <option key={category} value={category}>{category}</option>
+                          ))}
+                        </select>
+                      </Field>
+                      <Field label="Product Media">
+                        <div className="flex flex-col gap-3">
+                          <button
+                            type="button"
+                            onClick={() => fileInputRef.current?.click()}
+                            disabled={submitting || creatingProduct || updatingProduct || uploadingMedia}
+                            className={cx(
+                              'inline-flex items-center justify-center gap-2 rounded-lg border px-4 py-3 text-sm font-bold transition',
+                              submitting || creatingProduct || updatingProduct || uploadingMedia
+                                ? 'border-violet-500 bg-violet-500/10 text-violet-700 cursor-wait'
+                                : isDark
+                                  ? 'border-white/10 bg-slate-950 text-slate-100 hover:border-violet-500 hover:bg-violet-900/50'
+                                  : 'border-slate-300 bg-white text-slate-900 hover:border-violet-500 hover:bg-violet-50',
+                            )}
+                          >
+                            {submitting || creatingProduct || updatingProduct || uploadingMedia ? (
+                              <>
+                                <RotateCcw size={16} className="animate-spin" /> Uploading files...
+                              </>
+                            ) : (
+                              <>
+                                <ImagePlus size={16} />
+                                {productFiles.length ? `${productFiles.length} file(s) selected` : 'Choose files'}
+                              </>
+                            )}
+                          </button>
+                          <input
+                            ref={fileInputRef}
+                            type="file"
+                            accept="image/*"
+                            multiple
+                            onChange={handleProductFileSelect}
+                            className="hidden"
+                          />
+                        </div>
+                      </Field>
                       {productFilePreviews.length > 0 && (
                         <div className="grid grid-cols-2 gap-2">
                           {productFilePreviews.map((preview, idx) => (
