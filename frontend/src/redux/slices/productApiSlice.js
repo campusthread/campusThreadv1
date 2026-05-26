@@ -4,9 +4,8 @@ export const productApiSlice = apiSlice.injectEndpoints({
   endpoints: (builder) => ({
     getProducts: builder.query({
       query: (params = {}) => {
-        const queryParams = { limit: 100, ...params }
-        const queryString = new URLSearchParams(queryParams).toString()
-        return `/products?${queryString}`
+        const queryString = new URLSearchParams(params).toString()
+        return queryString ? `/products?${queryString}` : '/products'
       },
       transformResponse: (response) => response?.products || [],
       providesTags: ['Product'],

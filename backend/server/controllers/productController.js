@@ -20,14 +20,18 @@ const attachVendorFields = (product) => {
 };
 
 export const getProducts = async (req, res) => {
-  const limit = Number(req.query.limit) || 50;
-  const products = await Product.find()
+  const query = Product.find()
     .populate({
       path: "vendor",
       select: "brandName name university vendorStatus",
     })
-    .sort({ createdAt: -1 })
-    .limit(limit);
+    .sort({ createdAt: -1 });
+
+  if (req.query.limit) {
+    query.limit(Number(req.query.limit));
+  }
+
+  const products = await query;
 
   sendSuccess(res, {
     data: {
