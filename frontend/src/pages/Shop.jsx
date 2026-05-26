@@ -48,7 +48,7 @@ export default function Shop() {
   const { notifications } = useNotification()
 
   // Fetch from API instead of localStorage
-  const { data: productsData = [], error: productsError, isFetching: productsFetching } = useGetProductsQuery({ limit: 50 })
+  const { data: productsData = [], error: productsError, isFetching: productsFetching } = useGetProductsQuery({ limit: 100 })
   const { data: brandsData = [], isFetching: brandsFetching } = useGetBrandsQuery()
   const { data: categoriesData = [], isFetching: categoriesFetching } = useGetCategoriesQuery()
 

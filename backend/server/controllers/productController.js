@@ -25,17 +25,20 @@ export const getProducts = async (req, res) => {
     .populate({
       path: "vendor",
       select: "brandName name university vendorStatus",
-      match: { vendorStatus: "approved" }
     })
     .sort({ createdAt: -1 })
     .limit(limit);
 
-  // Filter out products whose vendors didn't match the filter (unapproved vendors)
-  const approvedProducts = products.filter(product => product.vendor !== null);
+  const visibleProducts = products.filter((product) => {
+    // Keep products when the vendor has been removed from the database,
+    // because the vendor did not explicitly delete the listing.
+    if (!product.vendor) return true;
+    return product.vendor.vendorStatus === "approved";
+  });
 
   sendSuccess(res, {
     data: {
-      products: approvedProducts.map(attachVendorFields),
+      products: visibleProducts.map(attachVendorFields),
     },
   });
 };
@@ -83,7 +86,12 @@ export const createProduct = async (req, res) => {
 };
 
 export const updateProduct = async (req, res) => {
-  const product = await Product.findOne({ _id: req.params.id, vendor: req.user._id });
+  const query = { _id: req.params.id };
+  if (req.user.role !== "admin") {
+    query.vendor = req.user._id;
+  }
+
+  const product = await Product.findOne(query);
   if (!product) {
     throw new AppError("Product not found", 404);
   }
@@ -104,11 +112,9 @@ export const updateProduct = async (req, res) => {
 };
 
 export const deleteProduct = async (req, res) => {
-  const isAdmin = req.user.role === "admin";
-
   const query = { _id: req.params.id };
-  if (!isAdmin) {
-    query.vendor = req.user._id; // Vendors can only delete their own products
+  if (req.user.role !== "admin") {
+    query.vendor = req.user._id;
   }
 
   const product = await Product.findOneAndDelete(query);

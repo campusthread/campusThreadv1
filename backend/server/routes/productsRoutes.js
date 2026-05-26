@@ -20,7 +20,7 @@ router.get("/", getProducts);
 router.get("/vendor/products", requireAuth, requireRole("vendor"), getVendorProducts);
 router.get("/:id", getProductById);
 router.post("/", requireAuth, requireRole("vendor"), createProduct);
-router.put("/:id", requireAuth, requireRole("vendor"), updateProduct);
+router.put("/:id", requireAuth, requireRole("vendor", "admin"), updateProduct);
 router.delete("/:id", requireAuth, requireRole("vendor", "admin"), deleteProduct);
 router.post('/:id/media', requireAuth, requireRole('vendor'), upload.array('media', 4), uploadProductMedia);
 router.post("/:id/reviews", requireAuth, addProductReview);
