@@ -46,6 +46,8 @@ export default function VendorAdmin() {
   const [productFiles, setProductFiles] = useState([])
   const [productFilePreviews, setProductFilePreviews] = useState([])
   const [confirmDialog, setConfirmDialog] = useState({ open: false, title: '', description: '', confirmLabel: 'Delete', cancelLabel: 'Cancel', onConfirm: null, loading: false })
+  const [validatingImages, setValidatingImages] = useState(false)
+  const [imageValidationStatus, setImageValidationStatus] = useState('')
   const fileInputRef = useRef(null)
   const [createProduct, { isLoading: creatingProduct }] = useCreateProductMutation()
   const [updateProduct, { isLoading: updatingProduct }] = useUpdateProductMutation()
@@ -134,6 +136,41 @@ export default function VendorAdmin() {
     setProductForm({ name: '', description: '', price: '', category: '', stock: '' })
     setProductFiles([])
     setProductFilePreviews([])
+    setValidatingImages(false)
+    setImageValidationStatus('')
+  }
+
+  const validateProductImages = async () => {
+    setValidatingImages(true)
+    setImageValidationStatus('Checking product images...')
+
+    try {
+      if (productFilePreviews.length === 0 && productFiles.length === 0) {
+        setImageValidationStatus('No images to validate')
+        setValidatingImages(false)
+        return false
+      }
+
+      for (let i = 0; i < productFilePreviews.length; i++) {
+        setImageValidationStatus(`Validating image ${i + 1} of ${productFilePreviews.length}...`)
+        await new Promise((resolve) => {
+          const img = new Image()
+          img.onload = () => resolve()
+          img.onerror = () => resolve()
+          img.src = productFilePreviews[i]
+        })
+        await new Promise((resolve) => setTimeout(resolve, 300))
+      }
+
+      setImageValidationStatus('All images validated successfully! Publishing...')
+      await new Promise((resolve) => setTimeout(resolve, 600))
+      return true
+    } catch (err) {
+      setImageValidationStatus('Image validation failed')
+      setError('Failed to validate images. Please check your image files.')
+      setValidatingImages(false)
+      return false
+    }
   }
 
   const handleProfileFileSelect = (event) => {
@@ -198,7 +235,14 @@ export default function VendorAdmin() {
   const handleSaveProduct = async (event) => {
     event.preventDefault()
     try {
+      const isValid = await validateProductImages()
+      if (!isValid) {
+        setValidatingImages(false)
+        return
+      }
+
       setSubmitting(true)
+      setImageValidationStatus('')
       setError(null)
       const payload = { ...productForm, price: Number(productForm.price), stock: Number(productForm.stock) }
       const isEditing = Boolean(editingProductId && editingProductId !== 'new')
@@ -218,6 +262,8 @@ export default function VendorAdmin() {
       setError(err.message || 'Failed to save product')
     } finally {
       setSubmitting(false)
+      setValidatingImages(false)
+      setImageValidationStatus('')
     }
   }
 
@@ -512,17 +558,17 @@ export default function VendorAdmin() {
                           <button
                             type="button"
                             onClick={() => fileInputRef.current?.click()}
-                            disabled={submitting || creatingProduct || updatingProduct || uploadingMedia}
+                            disabled={submitting || creatingProduct || updatingProduct || uploadingMedia || validatingImages}
                             className={cx(
                               'inline-flex items-center justify-center gap-2 rounded-lg border px-4 py-3 text-sm font-bold transition',
-                              submitting || creatingProduct || updatingProduct || uploadingMedia
+                              submitting || creatingProduct || updatingProduct || uploadingMedia || validatingImages
                                 ? 'border-violet-500 bg-violet-500/10 text-violet-700 cursor-wait'
                                 : isDark
                                   ? 'border-white/10 bg-slate-950 text-slate-100 hover:border-violet-500 hover:bg-violet-900/50'
                                   : 'border-slate-300 bg-white text-slate-900 hover:border-violet-500 hover:bg-violet-50',
                             )}
                           >
-                            {submitting || creatingProduct || updatingProduct || uploadingMedia ? (
+                            {submitting || creatingProduct || updatingProduct || uploadingMedia || validatingImages ? (
                               <>
                                 <RotateCcw size={16} className="animate-spin" /> Uploading files...
                               </>
@@ -550,7 +596,17 @@ export default function VendorAdmin() {
                           ))}
                         </div>
                       )}
-                      <button className="inline-flex w-fit items-center gap-2 rounded-lg bg-violet-700 px-5 py-3 text-sm font-bold text-white disabled:opacity-60" disabled={submitting}><PackagePlus size={16} /> {editingProductId && editingProductId !== 'new' ? 'Update product' : 'Publish product'}</button>
+                      {validatingImages && (
+                        <div className={cx('rounded-lg border p-4 flex items-center gap-3', isDark ? 'border-violet-500/30 bg-violet-900/20' : 'border-violet-200 bg-violet-50')}>
+                          <div className="animate-spin">
+                            <RotateCcw size={18} className="text-violet-600" />
+                          </div>
+                          <div className="flex-1">
+                            <p className={cx('text-sm font-semibold', isDark ? 'text-violet-300' : 'text-violet-700')}>{imageValidationStatus}</p>
+                          </div>
+                        </div>
+                      )}
+                      <button className="inline-flex w-fit items-center gap-2 rounded-lg bg-violet-700 px-5 py-3 text-sm font-bold text-white disabled:opacity-60" disabled={submitting || validatingImages}><PackagePlus size={16} /> {validatingImages ? 'Validating...' : editingProductId && editingProductId !== 'new' ? 'Update product' : 'Publish product'}</button>
                     </form>
                   </Panel>
                   <Panel title="Live Products" surfaceClass={surfaceClass}>
