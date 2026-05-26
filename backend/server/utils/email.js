@@ -69,10 +69,20 @@ export async function renderTemplate(name, context = {}) {
   return { html: inlined, text }
 }
 
-export async function sendEmail({ to, subject, template = 'welcome', context = {}, from } = {}) {
+export async function sendEmail({ to, subject, template = 'welcome', context = {}, from, htmlContent, attachments = [] } = {}) {
   if (!to) throw new Error('Missing `to` address')
   const sender = from || env.smtp.from || env.EMAIL_FROM || env.adminEmail || 'no-reply@localhost'
-  const { html, text } = await renderTemplate(template, context)
+
+  let html, text
+  if (htmlContent) {
+    html = htmlContent
+    text = htmlToText(htmlContent)
+  } else {
+    const rendered = await renderTemplate(template, context)
+    html = rendered.html
+    text = rendered.text
+  }
+
   const useBrevo = Boolean(process.env.BREVO_API_KEY)
   const useSmtp = Boolean(transporter)
 
@@ -118,6 +128,7 @@ export async function sendEmail({ to, subject, template = 'welcome', context = {
         subject,
         html,
         text,
+        attachments,
       })
       logger.info('SMTP send success', { to, messageId: info?.messageId, response: info?.response })
       return { provider: 'smtp', info }

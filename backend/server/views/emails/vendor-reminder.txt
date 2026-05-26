@@ -4,7 +4,7 @@ Hello {{name}},
 
 {{message}}
 
-Upload your latest products now: {{ctaUrl}}
+{{#if ctaText}}{{ctaText}}: {{/if}}{{ctaUrl}}
 
 Best,
 {{appName}}

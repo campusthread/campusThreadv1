@@ -385,7 +385,7 @@ export default function Home() {
           ))}
         </div>
         <div className={cx('mx-auto mt-10 max-w-7xl border-t pt-8 text-center text-sm', isDark ? 'border-white/10 text-slate-400' : 'border-slate-200 text-slate-500')}>
-          &copy; 2024 CampusThread. All rights reserved.
+          &copy; 2026 CampusThread. All rights reserved.
         </div>
       </footer>
     </div>

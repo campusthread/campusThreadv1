@@ -14,6 +14,7 @@ import {
   getAllVendors,
   getAllOrders,
   sendReminderEmails,
+  sendBroadcastMessage,
 } from "../controllers/adminController.js";
 
 const router = Router();
@@ -37,6 +38,7 @@ router.get("/vendors/pending", getPendingVendors);
 router.get("/vendors", getAllVendors);
 router.get("/orders", getAllOrders);
 router.post("/reminders", sendReminderEmails);
+router.post("/broadcast", sendBroadcastMessage);
 router.put("/vendors/:vendorId/approve", approveVendor);
 router.put("/vendors/:vendorId/reject", rejectVendor);
 

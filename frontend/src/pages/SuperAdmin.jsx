@@ -9,6 +9,7 @@ import { useGetCategoriesQuery, useCreateCategoryMutation, useDeleteCategoryMuta
 import { useGetAdsQuery, useCreateAdMutation, useDeleteAdMutation } from '../redux/slices/adApiSlice'
 import { useGetProductsQuery, useUpdateProductMutation, useDeleteProductMutation } from '../redux/slices/productApiSlice'
 import { useGetDashboardStatsQuery, useGetAllUsersQuery, useGetPendingVendorsQuery, useApproveVendorMutation, useRejectVendorMutation, useDeleteUserMutation, useUpdateUserRoleMutation, useGetAllOrdersQuery } from '../redux/slices/adminApiSlice'
+import apiClient from '../utils/api'
 
 const sections = [
   { key: 'dashboard', icon: LayoutDashboard, label: 'Dashboard' },
@@ -48,7 +49,7 @@ export default function SuperAdmin() {
   const [adImageFile, setAdImageFile] = useState(null)
   const adFileRef = useRef(null)
   const [confirmDialog, setConfirmDialog] = useState({ open: false, title: '', description: '', confirmLabel: 'Delete', cancelLabel: 'Cancel', onConfirm: null, loading: false })
-  const [reminderForm, setReminderForm] = useState({ audience: 'all', headline: '', message: '', ctaUrl: '' })
+  const [reminderForm, setReminderForm] = useState({ audience: 'all', headline: '', message: '', ctaUrl: '', ctaText: '', imageUrl: '' })
   const [sendingReminders, setSendingReminders] = useState(false)
 
   // Fetch from API instead of localStorage
@@ -98,6 +99,11 @@ export default function SuperAdmin() {
     const id = Date.now()
     setAlerts((current) => [...current, { id, message, type }])
     setTimeout(() => setAlerts((current) => current.filter((alert) => alert.id !== id)), 5000)
+  }
+
+  const handleClearReminderImage = (event) => {
+    event.preventDefault()
+    setReminderForm((current) => ({ ...current, imageUrl: '' }))
   }
 
   const handleApproveVendor = async (vendorId) => {
@@ -1005,19 +1011,9 @@ export default function SuperAdmin() {
                   }
                   try {
                     setSendingReminders(true)
-                    const response = await fetch('/api/admin/reminders', {
-                      method: 'POST',
-                      headers: { 'Content-Type': 'application/json' },
-                      credentials: 'include',
-                      body: JSON.stringify(reminderForm),
-                    })
-                    if (!response.ok) {
-                      const data = await response.json()
-                      throw new Error(data.message || 'Failed to send reminders')
-                    }
-                    const data = await response.json()
+                    const data = await apiClient.post('/admin/reminders', reminderForm)
                     showAlert(`Reminders sent to ${data.data?.successCount || 0} users!`, 'success')
-                    setReminderForm({ audience: 'all', headline: '', message: '', ctaUrl: '' })
+                    setReminderForm({ audience: 'all', headline: '', message: '', ctaUrl: '', ctaText: '', imageUrl: '' })
                   } catch (err) {
                     showAlert(err?.message || 'Failed to send reminders', 'error')
                   } finally {
@@ -1041,6 +1037,46 @@ export default function SuperAdmin() {
                   <div>
                     <label className="block text-sm font-bold mb-2">Email Message:</label>
                     <textarea value={reminderForm.message} onChange={(e) => setReminderForm({ ...reminderForm, message: e.target.value })} placeholder="Write a friendly, engaging message for users..." rows="4" className={inputClass} />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-bold mb-2">Image URL (Optional):</label>
+                    <input type="url" value={reminderForm.imageUrl} onChange={(e) => setReminderForm({ ...reminderForm, imageUrl: e.target.value })} placeholder="https://example.com/image.jpg" className={inputClass} />
+                    <p className={cx('text-xs mt-1', mutedText)}>Paste a full image URL, or choose one from the gallery below.</p>
+                  </div>
+
+                  {ads.length > 0 && (
+                    <div className="space-y-3 rounded-2xl border border-dashed p-4">
+                      <div className="flex items-center justify-between">
+                        <p className="text-sm font-bold">Select from gallery</p>
+                        <button type="button" onClick={handleClearReminderImage} className="text-xs font-semibold text-slate-500 hover:text-slate-700">Clear</button>
+                      </div>
+                      <div className="grid gap-3 sm:grid-cols-3">
+                        {ads.map((ad) => {
+                          const imageSrc = ad.image || ad.imageUrl || ''
+                          const isSelected = reminderForm.imageUrl === imageSrc
+                          return (
+                            <button
+                              key={ad._id || ad.id || imageSrc}
+                              type="button"
+                              onClick={() => setReminderForm({ ...reminderForm, imageUrl: imageSrc })}
+                              className={cx(
+                                'overflow-hidden rounded-2xl border transition duration-200',
+                                isSelected ? 'border-violet-700 ring-2 ring-violet-300/50' : 'border-slate-200 hover:border-violet-500',
+                              )}
+                            >
+                              <img src={imageSrc} alt={ad.title || 'Ad image'} className="h-24 w-full object-cover" />
+                              <div className="px-2 py-2 text-xs font-semibold text-slate-700">{ad.title || 'Gallery image'}</div>
+                            </button>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  <div>
+                    <label className="block text-sm font-bold mb-2">CTA Text (Optional):</label>
+                    <input type="text" value={reminderForm.ctaText} onChange={(e) => setReminderForm({ ...reminderForm, ctaText: e.target.value })} placeholder="Browse products" className={inputClass} />
                   </div>
 
                   <div>

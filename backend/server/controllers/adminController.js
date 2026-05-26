@@ -7,6 +7,20 @@ import Brand from "../models/Brand.js";
 import * as emailService from "../services/emailService.js";
 import { logger } from "../utils/logger.js";
 
+const resolveReminderAudienceFilter = (audience) => {
+  const normalizedAudience = (audience || 'all').toLowerCase();
+
+  if (normalizedAudience === 'vendors') {
+    return { role: 'vendor' };
+  }
+
+  if (normalizedAudience === 'customers' || normalizedAudience === 'buyers') {
+    return { role: { $in: ['customer', 'buyer'] } };
+  }
+
+  return { role: { $in: ['customer', 'vendor', 'buyer'] } };
+};
+
 const buildDashboardStats = async () => {
   const totalUsers = await User.countDocuments();
   const totalVendors = await User.countDocuments({ role: "vendor" });
@@ -247,7 +261,7 @@ export const getAllOrders = async (req, res) => {
 
 export const sendReminderEmails = async (req, res) => {
   try {
-    const { audience = 'all', headline, message, ctaUrl } = req.body;
+    const { audience = 'all', headline, message, ctaUrl, ctaText, imageUrl } = req.body;
     const normalizedAudience = audience.toLowerCase();
 
     const allowedAudiences = ['vendors', 'customers', 'buyers', 'all'];
@@ -255,14 +269,7 @@ export const sendReminderEmails = async (req, res) => {
       throw new AppError('Invalid audience. Use vendors, customers, buyers, or all.', 400);
     }
 
-    const filter = {};
-    if (normalizedAudience === 'vendors') {
-      filter.role = 'vendor';
-    } else if (normalizedAudience === 'customers' || normalizedAudience === 'buyers') {
-      filter.role = 'customer';
-    } else {
-      filter.role = { $in: ['customer', 'vendor'] };
-    }
+    const filter = resolveReminderAudienceFilter(audience);
 
     const users = await User.find(filter).select('name email role brandName');
 
@@ -273,6 +280,8 @@ export const sendReminderEmails = async (req, res) => {
             headline,
             message,
             ctaUrl,
+            ctaText,
+            imageUrl,
           });
         }
 
@@ -280,6 +289,8 @@ export const sendReminderEmails = async (req, res) => {
           headline,
           message,
           ctaUrl,
+          ctaText,
+          imageUrl,
         });
       }),
     );
@@ -403,5 +414,60 @@ export const getAllVendors = async (req, res) => {
     });
   } catch (error) {
     sendError(res, error.message, 500);
+  }
+};
+
+// Send broadcast message to all non-admin users
+export const sendBroadcastMessage = async (req, res) => {
+  try {
+    const { subject, message, imageUrl, ctaUrl, ctaText } = req.body;
+
+    if (!message) {
+      throw new AppError('Message content is required', 400);
+    }
+
+    // Fetch all users except admins
+    const users = await User.find({ role: { $ne: 'admin' } }).select('name email role');
+
+    if (users.length === 0) {
+      return sendSuccess(res, {
+        message: 'No non-admin users found to send messages to',
+        data: {
+          totalRecipients: 0,
+          successCount: 0,
+        },
+      });
+    }
+
+    const results = await Promise.allSettled(
+      users.map((user) =>
+        emailService.sendBroadcastMessageEmail(user, {
+          subject,
+          message,
+          imageUrl,
+          ctaUrl,
+          ctaText,
+        })
+      )
+    );
+
+    const successCount = results.filter((result) => result.status === 'fulfilled').length;
+
+    logger.info('Broadcast message sent', {
+      totalRecipients: users.length,
+      successCount,
+      subject,
+    });
+
+    sendSuccess(res, {
+      message: 'Broadcast message sent successfully',
+      data: {
+        totalRecipients: users.length,
+        successCount,
+        failureCount: users.length - successCount,
+      },
+    });
+  } catch (error) {
+    sendError(res, error.message, error.statusCode || 500);
   }
 };

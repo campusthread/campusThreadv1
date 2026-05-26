@@ -4,7 +4,7 @@ Hi {{name}},
 
 {{message}}
 
-Browse campus products and deals now: {{ctaUrl}}
+{{#if ctaText}}{{ctaText}}: {{/if}}{{ctaUrl}}
 
 Thanks,
 {{appName}}

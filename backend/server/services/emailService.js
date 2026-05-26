@@ -100,7 +100,7 @@ export const sendPasswordResetConfirmation = async (user) => {
     });
 };
 
-export const sendBuyerPromotionEmail = async (buyer, { headline, message, ctaUrl } = {}) => {
+export const sendBuyerPromotionEmail = async (buyer, { headline, message, ctaUrl, ctaText, imageUrl } = {}) => {
     return safeSendEmail({
         to: buyer.email,
         subject: `New deals and campus picks just for you`,
@@ -110,11 +110,13 @@ export const sendBuyerPromotionEmail = async (buyer, { headline, message, ctaUrl
             headline: headline || "Fresh campus deals are waiting",
             message: message || "Discover trending products and exclusive offers from student vendors on CampusThread.",
             ctaUrl: ctaUrl || `${appUrl}/shop`,
+            ctaText: ctaText || "Browse products",
+            imageUrl,
         },
     });
 };
 
-export const sendVendorUploadReminderEmail = async (vendor, { headline, message, ctaUrl } = {}) => {
+export const sendVendorUploadReminderEmail = async (vendor, { headline, message, ctaUrl, ctaText, imageUrl } = {}) => {
     return safeSendEmail({
         to: vendor.email,
         subject: `Upload new products and boost your CampusThread sales`,
@@ -125,6 +127,8 @@ export const sendVendorUploadReminderEmail = async (vendor, { headline, message,
             headline: headline || "Keep your store fresh with new products",
             message: message || "Students are browsing right now — upload your latest items to reach more buyers.",
             ctaUrl: ctaUrl || `${appUrl}/vendor-admin`,
+            ctaText: ctaText || "Upload product",
+            imageUrl,
         },
     });
 };
@@ -182,6 +186,26 @@ export const sendOrderStatusUpdateEmail = async (order, buyer) => {
                 price: item.price,
             })),
             totalAmount: order.totalAmount,
+        },
+    });
+};
+
+export const sendBroadcastMessageEmail = async (user, { subject, message, imageUrl, ctaUrl, ctaText } = {}) => {
+    const htmlContent = `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+            <h2 style="color: #333; margin-bottom: 20px;">${subject || 'Message from CampusThread'}</h2>
+            ${imageUrl ? `<img src="${imageUrl}" alt="Message Image" style="width: 100%; max-width: 500px; height: auto; margin-bottom: 20px; border-radius: 8px;">` : ''}
+            <p style="color: #555; line-height: 1.6; margin-bottom: 20px;">${message || ''}</p>
+            ${ctaUrl && ctaText ? `<a href="${ctaUrl}" style="display: inline-block; background-color: #007bff; color: white; padding: 12px 24px; text-decoration: none; border-radius: 4px; margin-top: 10px;">${ctaText}</a>` : ''}
+        </div>
+    `;
+
+    return safeSendEmail({
+        to: user.email,
+        subject: subject || 'Message from CampusThread',
+        htmlContent,
+        context: {
+            name: user.name,
         },
     });
 };

@@ -13,9 +13,9 @@ const buildAudienceFilter = (audience) => {
     return { role: "vendor" };
   }
   if (normalized === "customers" || normalized === "buyers") {
-    return { role: "customer" };
+    return { role: { $in: ["customer", "buyer"] } };
   }
-  return { role: { $in: ["customer", "vendor"] } };
+  return { role: { $in: ["customer", "vendor", "buyer"] } };
 };
 
 const getDefaultContent = (role) => {
