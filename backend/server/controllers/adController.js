@@ -1,3 +1,4 @@
+import mongoose from "mongoose";
 import { v4 as uuid } from "uuid";
 import Ad from "../models/Ad.js";
 import { AppError } from "../utils/errors.js";
@@ -42,10 +43,16 @@ export const createAd = async (req, res) => {
 };
 
 export const deleteAd = async (req, res) => {
-  const ad = await Ad.findById(req.params.id);
+  const { id } = req.params;
+
+  if (!mongoose.isValidObjectId(id)) {
+    throw new AppError("Invalid ad ID", 400);
+  }
+
+  const ad = await Ad.findByIdAndDelete(id);
   if (!ad) {
     throw new AppError("Ad not found", 404);
   }
-  await ad.deleteOne();
-  sendSuccess(res, { message: "Ad deleted" });
+
+  sendSuccess(res, { message: "Ad deleted", data: { ad } });
 };

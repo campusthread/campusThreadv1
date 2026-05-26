@@ -976,7 +976,7 @@ export default function SuperAdmin() {
                                   await deleteAd(ad._id || ad.id).unwrap()
                                   showAlert('Ad deleted successfully!', 'success')
                                 } catch (err) {
-                                  showAlert(err?.data?.message || 'Failed to delete ad', 'error')
+                                  showAlert(err?.data?.message || err?.message || err?.error || 'Failed to delete ad', 'error')
                                 } finally {
                                   setConfirmDialog({ open: false, title: '', description: '', confirmLabel: 'Delete', cancelLabel: 'Cancel', onConfirm: null, loading: false })
                                 }
