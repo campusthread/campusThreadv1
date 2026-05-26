@@ -104,7 +104,14 @@ export const updateProduct = async (req, res) => {
 };
 
 export const deleteProduct = async (req, res) => {
-  const product = await Product.findOneAndDelete({ _id: req.params.id, vendor: req.user._id });
+  const isAdmin = req.user.role === "admin";
+  
+  const query = { _id: req.params.id };
+  if (!isAdmin) {
+    query.vendor = req.user._id; // Vendors can only delete their own products
+  }
+  
+  const product = await Product.findOneAndDelete(query);
   if (!product) {
     throw new AppError("Product not found", 404);
   }
