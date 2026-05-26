@@ -29,16 +29,9 @@ export const getProducts = async (req, res) => {
     .sort({ createdAt: -1 })
     .limit(limit);
 
-  const visibleProducts = products.filter((product) => {
-    // Keep products when the vendor has been removed from the database,
-    // because the vendor did not explicitly delete the listing.
-    if (!product.vendor) return true;
-    return product.vendor.vendorStatus === "approved";
-  });
-
   sendSuccess(res, {
     data: {
-      products: visibleProducts.map(attachVendorFields),
+      products: products.map(attachVendorFields),
     },
   });
 };
