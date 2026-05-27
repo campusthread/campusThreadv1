@@ -45,84 +45,85 @@ export default function App() {
       <PolicyProvider>
         <AuthProvider>
           <BrowserRouter>
-          <Routes>
-            <Route path="/" element={<Home />} />
-            <Route path="/auth" element={<Auth />} />
-            <Route path="/shop" element={<Shop />} />
-            <Route path="/explore" element={<Explore />} />
-            <Route path="/cart" element={<Cart />} />
-            <Route
-              path="/favorites"
-              element={
-                <ProtectedRoute>
-                  <Favorites />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/profile"
-              element={
-                <ProtectedRoute>
-                  <Profile />
-                </ProtectedRoute>
-              }
-            />
-            <Route path="/product/:id" element={<ProductDetail />} />
-            <Route
-              path="/checkout"
-              element={
-                <ProtectedRoute>
-                  <Checkout />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/orders"
-              element={
-                <ProtectedRoute>
-                  <OrderHistory />
-                </ProtectedRoute>
-              }
-            />
-            <Route path="/payment-success" element={<PaymentSuccess />} />
-            <Route
-              path="/vendor-admin"
-              element={
-                <ProtectedRoute requiredRole="vendor">
-                  <VendorAdmin />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/super-admin"
-              element={
-                <ProtectedRoute requiredRole="admin">
-                  <SuperAdmin />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/super-admin/vendors"
-              element={
-                <ProtectedRoute requiredRole="admin">
-                  <SuperAdminVendors />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/super-admin/:tab"
-              element={
-                <ProtectedRoute requiredRole="admin">
-                  <SuperAdmin />
-                </ProtectedRoute>
-              }
-            />
-            <Route path="/super-admin-login" element={<SuperAdminLogin />} />
-            <Route path="/super-admin-register" element={<SuperAdminRegister />} />
-          </Routes>
-        </BrowserRouter>
-      </AuthProvider>
-    </PolicyProvider>
-  </ThemeProvider>
+            <Routes>
+              <Route path="/" element={<Home />} />
+              <Route path="/auth" element={<Auth />} />
+              <Route path="/shop" element={<Shop />} />
+              <Route path="/explore" element={<Explore />} />
+              <Route path="/explore/:brandName" element={<Explore />} />
+              <Route path="/cart" element={<Cart />} />
+              <Route
+                path="/favorites"
+                element={
+                  <ProtectedRoute>
+                    <Favorites />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/profile"
+                element={
+                  <ProtectedRoute>
+                    <Profile />
+                  </ProtectedRoute>
+                }
+              />
+              <Route path="/product/:id" element={<ProductDetail />} />
+              <Route
+                path="/checkout"
+                element={
+                  <ProtectedRoute>
+                    <Checkout />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/orders"
+                element={
+                  <ProtectedRoute>
+                    <OrderHistory />
+                  </ProtectedRoute>
+                }
+              />
+              <Route path="/payment-success" element={<PaymentSuccess />} />
+              <Route
+                path="/vendor-admin"
+                element={
+                  <ProtectedRoute requiredRole="vendor">
+                    <VendorAdmin />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/super-admin"
+                element={
+                  <ProtectedRoute requiredRole="admin">
+                    <SuperAdmin />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/super-admin/vendors"
+                element={
+                  <ProtectedRoute requiredRole="admin">
+                    <SuperAdminVendors />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/super-admin/:tab"
+                element={
+                  <ProtectedRoute requiredRole="admin">
+                    <SuperAdmin />
+                  </ProtectedRoute>
+                }
+              />
+              <Route path="/super-admin-login" element={<SuperAdminLogin />} />
+              <Route path="/super-admin-register" element={<SuperAdminRegister />} />
+            </Routes>
+          </BrowserRouter>
+        </AuthProvider>
+      </PolicyProvider>
+    </ThemeProvider>
   )
 }

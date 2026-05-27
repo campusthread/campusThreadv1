@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useParams } from 'react-router-dom'
 import { Building2, Inbox, Package, Store, University, Search, X } from 'lucide-react'
 import Carousel from '../components/Carousel'
 import Navbar from '../components/Navbar'
@@ -26,6 +26,7 @@ export default function Explore() {
   const isDark = theme === 'dark'
   const { notifications } = useNotification()
   const navigate = useNavigate()
+  const { brandName } = useParams()
 
   // Fetch brands and products from API instead of localStorage
   const { data: brandsData = [], isLoading: brandsLoading } = useGetBrandsQuery()
@@ -47,12 +48,17 @@ export default function Explore() {
   const isLoading = brandsLoading || productsLoading
 
   useEffect(() => {
-    if (safeBrands.length > 0 && !currentBrand) {
+    if (brandName) {
+      // If brandName is in URL params, use it
+      setCurrentBrand(decodeURIComponent(brandName))
+    } else if (safeBrands.length > 0 && !currentBrand) {
+      // Otherwise, set to first brand
       setCurrentBrand(safeBrands[0])
     } else if (currentBrand && !safeBrands.includes(currentBrand)) {
+      // If current brand not in list, reset to first
       setCurrentBrand(safeBrands[0])
     }
-  }, [safeBrands, currentBrand])
+  }, [safeBrands, brandName, currentBrand])
 
   return (
     <div className={cx('min-h-screen transition-colors duration-300', pageClass)}>
@@ -106,7 +112,7 @@ export default function Explore() {
                     <button
                       key={brand}
                       type="button"
-                      onClick={() => setCurrentBrand(brand)}
+                      onClick={() => navigate(`/explore/${encodeURIComponent(brand)}`)}
                       className={cx(
                         'shrink-0 rounded-full border px-5 py-2 text-sm font-bold uppercase tracking-wide transition',
                         currentBrand === brand
