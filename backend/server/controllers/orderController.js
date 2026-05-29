@@ -227,10 +227,19 @@ export const initializePaymentWithOrder = async (req, res) => {
   const totalAmount = items.reduce((sum, item) => sum + item.price * item.quantity, 0);
   const reference = `pay_${uuid().replace(/-/g, '')}`;
 
-  // Do NOT create a persistent pending order here. The order will be
-  // created by `verifyPayment` only after Paystack confirms a successful
-  // transaction. This avoids dashboard counts increasing for cancelled
-  // or abandoned payments.
+  // Create a pending order immediately so the buyer always has a record,
+  // then update it to paid after Paystack confirmation.
+  const pendingOrder = await Order.create({
+    orderNumber: `CT-${uuid().slice(0, 8).toUpperCase()}`,
+    buyer: req.user._id,
+    items,
+    shippingAddress: req.body.shippingAddress || {},
+    paymentMethod: req.body.paymentMethod || 'paystack',
+    totalAmount,
+    paymentReference: reference,
+    paymentStatus: 'pending',
+    status: 'pending',
+  });
 
   // Build metadata to include minimal order payload and buyer id
   const metadata = {
@@ -321,7 +330,11 @@ export const verifyPayment = async (req, res) => {
 
     const tx = data.data;
 
-    // If order does not exist yet, attempt to create it from Paystack metadata
+    // If the pending order already exists, use it. Otherwise create from metadata.
+    if (!order) {
+      order = await Order.findOne({ paymentReference: reference });
+    }
+
     if (!order) {
       logger.info('Order not found in database, attempting to create from Paystack metadata', { reference });
       const meta = tx.metadata || {};
