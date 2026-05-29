@@ -139,6 +139,11 @@ export const updateOrderStatus = async (req, res) => {
   })();
 };
 
+const getCallbackBase = (req) => {
+  const candidate = req.body?.callback_url || req.headers?.origin || env.clientUrl || process.env.CLIENT_URL || '';
+  return String(candidate).replace(/\/+$/, '');
+};
+
 export const initializePayment = async (req, res) => {
   const order = await Order.findById(req.params.id);
   if (!order) {
@@ -151,12 +156,12 @@ export const initializePayment = async (req, res) => {
 
   // Try initializing a Paystack transaction and return the authorization URL.
   try {
-    const callbackBase = req.body.callback_url || env.clientUrl;
+    const callbackBase = getCallbackBase(req);
     const payload = {
       email: req.body.email || req.user?.email,
       amount: Math.round((order.totalAmount || 0) * 100),
       reference,
-      callback_url: `${callbackBase.replace(/\/+$/, '')}/payment-success?reference=${reference}`,
+      callback_url: `${callbackBase}/payment-success?reference=${reference}`,
     };
 
     const resp = await fetch('https://api.paystack.co/transaction/initialize', {
@@ -237,12 +242,12 @@ export const initializePaymentWithOrder = async (req, res) => {
   };
 
   try {
-    const callbackBase = req.body.callback_url || env.clientUrl;
+    const callbackBase = getCallbackBase(req);
     const payload = {
       email: req.body.email || req.user?.email,
       amount: Math.round(totalAmount * 100),
       reference,
-      callback_url: `${callbackBase.replace(/\/+$/, '')}/payment-success?reference=${reference}`,
+      callback_url: `${callbackBase}/payment-success?reference=${reference}`,
       metadata,
     };
 
