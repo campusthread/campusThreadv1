@@ -66,6 +66,14 @@ export const adminApiSlice = apiSlice.injectEndpoints({
       invalidatesTags: ['Vendors', 'Users'],
     }),
 
+    togglePinVendor: builder.mutation({
+      query: (vendorId) => ({
+        url: `/admin/vendors/${vendorId}/pin`,
+        method: 'PUT',
+      }),
+      invalidatesTags: ['Vendors', 'Users', 'Product'],
+    }),
+
     getAllVendors: builder.query({
       query: ({ status, search, page = 1, limit = 10 } = {}) => {
         const params = new URLSearchParams()
@@ -110,6 +118,7 @@ export const {
   useGetPendingVendorsQuery,
   useApproveVendorMutation,
   useRejectVendorMutation,
+  useTogglePinVendorMutation,
   useGetAllVendorsQuery,
   useGetDashboardStatsQuery,
   useGetAllOrdersQuery,

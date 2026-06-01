@@ -232,6 +232,11 @@ export default function VendorAdmin() {
     setActiveTab('products')
   }
 
+  const handleRemoveProductImage = (index) => {
+    setProductFilePreviews((prevPreviews) => prevPreviews.filter((_, i) => i !== index))
+    setProductFiles((prevFiles) => prevFiles.filter((_, i) => i !== index))
+  }
+
   const handleSaveProduct = async (event) => {
     event.preventDefault()
     try {
@@ -592,7 +597,17 @@ export default function VendorAdmin() {
                       {productFilePreviews.length > 0 && (
                         <div className="grid grid-cols-2 gap-2">
                           {productFilePreviews.map((preview, idx) => (
-                            <img key={`${preview}-${idx}`} src={preview} alt={`Preview ${idx + 1}`} className="h-36 w-full rounded-xl object-cover" />
+                            <div key={`${preview}-${idx}`} className="relative">
+                              <img src={preview} alt={`Preview ${idx + 1}`} className="h-36 w-full rounded-xl object-cover" />
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveProductImage(idx)}
+                                className="absolute right-1 top-1 rounded-full bg-red-600 p-1.5 text-white shadow-lg transition hover:bg-red-700"
+                                title="Remove image"
+                              >
+                                <X size={16} />
+                              </button>
+                            </div>
                           ))}
                         </div>
                       )}

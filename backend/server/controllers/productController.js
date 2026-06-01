@@ -4,7 +4,7 @@ import Product from "../models/Product.js";
 import * as emailService from "../services/emailService.js";
 import { uploadBufferToCloudinary } from "../utils/cloudinary.js";
 import { AppError } from "../utils/errors.js";
-import { sendSuccess } from "../utils/response.js";
+import { sendSuccess, sendError } from "../utils/response.js";
 import { logger } from "../utils/logger.js";
 
 const attachVendorFields = (product) => {
@@ -20,24 +20,54 @@ const attachVendorFields = (product) => {
 };
 
 export const getProducts = async (req, res) => {
-  const query = Product.find()
-    .populate({
-      path: "vendor",
-      select: "brandName name university vendorStatus",
-    })
-    .sort({ createdAt: -1 });
+  try {
+    const pipeline = [
+      {
+        $lookup: {
+          from: "users",
+          localField: "vendor",
+          foreignField: "_id",
+          as: "vendor",
+        },
+      },
+      {
+        $unwind: "$vendor",
+      },
+      {
+        $addFields: {
+          vendorIsPinned: { $ifNull: ["$vendor.isPinned", false] },
+        },
+      },
+      {
+        $sort: {
+          vendorIsPinned: -1,
+          createdAt: -1,
+        },
+      },
+    ];
 
-  if (req.query.limit) {
-    query.limit(Number(req.query.limit));
+    if (req.query.limit) {
+      pipeline.push({ $limit: Number(req.query.limit) });
+    }
+
+    const products = await Product.aggregate(pipeline);
+
+    sendSuccess(res, {
+      data: {
+        products: products.map((product) => {
+          const vendor = product.vendor;
+          const data = { ...product };
+          if (vendor && typeof vendor === "object") {
+            data.brand = data.brand || vendor.brandName || vendor.name || "";
+            data.university = data.university || vendor.university || "";
+          }
+          return data;
+        }),
+      },
+    });
+  } catch (error) {
+    sendError(res, error.message, 500);
   }
-
-  const products = await query;
-
-  sendSuccess(res, {
-    data: {
-      products: products.map(attachVendorFields),
-    },
-  });
 };
 
 export const getProductById = async (req, res) => {

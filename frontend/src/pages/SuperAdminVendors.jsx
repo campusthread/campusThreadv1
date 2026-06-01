@@ -1,8 +1,8 @@
 import { useMemo, useState } from 'react'
-import { ArrowLeft, Search, Check, X } from 'lucide-react'
+import { ArrowLeft, Search, Check, X, Pin } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { useTheme } from '../context/ThemeContext'
-import { useGetAllVendorsQuery, useApproveVendorMutation, useRejectVendorMutation } from '../redux/slices/adminApiSlice'
+import { useGetAllVendorsQuery, useApproveVendorMutation, useRejectVendorMutation, useTogglePinVendorMutation } from '../redux/slices/adminApiSlice'
 
 const formatCurrency = (value) => new Intl.NumberFormat('en-NG', { style: 'currency', currency: 'NGN', maximumFractionDigits: 0 }).format(Number(value || 0))
 const cx = (...classes) => classes.filter(Boolean).join(' ')
@@ -18,6 +18,7 @@ export default function SuperAdminVendors() {
   const { data, isLoading, isError } = useGetAllVendorsQuery({ search, page: 1, limit: 100 })
   const [approveVendor, { isLoading: isApproving }] = useApproveVendorMutation()
   const [rejectVendor, { isLoading: isRejecting }] = useRejectVendorMutation()
+  const [togglePinVendor, { isLoading: isPinning }] = useTogglePinVendorMutation()
   const vendors = data?.vendors || []
   const totalVendors = vendors.length
 
@@ -54,6 +55,17 @@ export default function SuperAdminVendors() {
       setShowRejectModal(null)
     } catch (err) {
       alert('Failed to reject vendor: ' + (err?.data?.message || err.message))
+    } finally {
+      setActioningId(null)
+    }
+  }
+
+  const handlePin = async (vendorId) => {
+    try {
+      setActioningId(vendorId)
+      await togglePinVendor(vendorId).unwrap()
+    } catch (err) {
+      alert('Failed to toggle vendor pin: ' + (err?.data?.message || err.message))
     } finally {
       setActioningId(null)
     }
@@ -105,7 +117,7 @@ export default function SuperAdminVendors() {
             <table className="min-w-full table-auto text-left">
               <thead className={cx('border-b', isDark ? 'border-slate-700 bg-slate-950' : 'border-slate-200 bg-slate-50')}>
                 <tr>
-                  {['Brand Name', 'Brand Owner', 'Email', 'Phone', 'Status', 'Bank', 'Account Number', 'Created', 'Actions'].map((heading) => (
+                  {['Brand Name', 'Brand Owner', 'Email', 'Phone', 'Status', 'Bank', 'Account Number', 'Created', 'Pinned', 'Actions'].map((heading) => (
                     <th key={heading} className="px-4 py-4 text-xs font-semibold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">
                       {heading}
                     </th>
@@ -115,19 +127,19 @@ export default function SuperAdminVendors() {
               <tbody className={cx('divide-y', isDark ? 'divide-slate-800' : 'divide-slate-200')}>
                 {isLoading ? (
                   <tr>
-                    <td colSpan={9} className="px-4 py-12 text-center text-slate-500 dark:text-slate-400">
+                    <td colSpan={10} className="px-4 py-12 text-center text-slate-500 dark:text-slate-400">
                       Loading vendor profiles...
                     </td>
                   </tr>
                 ) : isError ? (
                   <tr>
-                    <td colSpan={9} className="px-4 py-12 text-center text-red-600 dark:text-red-400">
+                    <td colSpan={10} className="px-4 py-12 text-center text-red-600 dark:text-red-400">
                       Failed to load vendor profiles.
                     </td>
                   </tr>
                 ) : filteredVendors.length === 0 ? (
                   <tr>
-                    <td colSpan={9} className="px-4 py-12 text-center text-slate-500 dark:text-slate-400">
+                    <td colSpan={10} className="px-4 py-12 text-center text-slate-500 dark:text-slate-400">
                       No vendors found.
                     </td>
                   </tr>
@@ -146,6 +158,22 @@ export default function SuperAdminVendors() {
                       <td className={cx('px-4 py-4', isDark ? 'text-slate-300' : 'text-slate-600')}>{vendor.bankName || 'N/A'}</td>
                       <td className={cx('px-4 py-4', isDark ? 'text-slate-300' : 'text-slate-600')}>{vendor.accountNumber || 'N/A'}</td>
                       <td className={cx('px-4 py-4', isDark ? 'text-slate-300' : 'text-slate-600')}>{new Date(vendor.createdAt || Date.now()).toLocaleDateString()}</td>
+                      <td className="px-4 py-4">
+                        <button
+                          type="button"
+                          onClick={() => handlePin(vendor._id || vendor.id)}
+                          disabled={actioningId === (vendor._id || vendor.id) || isPinning}
+                          className={cx(
+                            'inline-flex items-center gap-1 rounded-lg px-3 py-2 text-xs font-bold transition disabled:opacity-50 disabled:cursor-not-allowed',
+                            vendor.isPinned
+                              ? 'bg-violet-600 text-white hover:bg-violet-700'
+                              : 'bg-slate-200 text-slate-700 hover:bg-slate-300 dark:bg-slate-700 dark:text-slate-200 dark:hover:bg-slate-600'
+                          )}
+                        >
+                          <Pin size={14} />
+                          {actioningId === (vendor._id || vendor.id) && isPinning ? 'Pinning...' : vendor.isPinned ? 'Pinned' : 'Pin'}
+                        </button>
+                      </td>
                       <td className="px-4 py-4">
                         {vendor.vendorStatus === 'pending' ? (
                           <div className="flex gap-2">

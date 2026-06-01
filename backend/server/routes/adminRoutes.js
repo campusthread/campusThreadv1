@@ -15,6 +15,7 @@ import {
   getAllOrders,
   sendReminderEmails,
   sendBroadcastMessage,
+  togglePinVendor,
 } from "../controllers/adminController.js";
 
 const router = Router();
@@ -41,5 +42,6 @@ router.post("/reminders", sendReminderEmails);
 router.post("/broadcast", sendBroadcastMessage);
 router.put("/vendors/:vendorId/approve", approveVendor);
 router.put("/vendors/:vendorId/reject", rejectVendor);
+router.put("/vendors/:vendorId/pin", togglePinVendor);
 
 export default router;

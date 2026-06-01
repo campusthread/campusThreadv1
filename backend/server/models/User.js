@@ -213,6 +213,11 @@ const userSchema = new mongoose.Schema(
       trim: true,
       default: "",
     },
+    isPinned: {
+      type: Boolean,
+      default: false,
+      index: true,
+    },
   },
   { timestamps: true },
 );

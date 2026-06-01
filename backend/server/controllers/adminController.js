@@ -417,6 +417,27 @@ export const getAllVendors = async (req, res) => {
   }
 };
 
+// Toggle vendor pin status
+export const togglePinVendor = async (req, res) => {
+  try {
+    const { vendorId } = req.params;
+
+    const vendor = await User.findById(vendorId);
+    if (!vendor) throw new AppError("Vendor not found", 404);
+    if (vendor.role !== "vendor") throw new AppError("User is not a vendor", 400);
+
+    vendor.isPinned = !vendor.isPinned;
+    await vendor.save();
+
+    sendSuccess(res, {
+      message: vendor.isPinned ? "Vendor pinned successfully" : "Vendor unpinned successfully",
+      data: { vendor: vendor },
+    });
+  } catch (error) {
+    sendError(res, error.message, error.statusCode || 500);
+  }
+};
+
 // Send broadcast message to all non-admin users
 export const sendBroadcastMessage = async (req, res) => {
   try {
