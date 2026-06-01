@@ -36,9 +36,27 @@ export default function Explore() {
 
   const brandNamesFromBrands = Array.isArray(brandsData) ? brandsData.map((b) => b.name).filter(Boolean) : []
   const brandNamesFromProducts = Array.isArray(productsData)
-    ? productsData.map((product) => product.brand).filter(Boolean)
+    ? productsData.map((product) => product.vendor?.brandName || product.brand).filter(Boolean)
     : []
-  const safeBrands = Array.from(new Set([...brandNamesFromBrands, ...brandNamesFromProducts])).sort()
+
+  // Prefer brands from pinned vendors first, then alphabetical
+  const brandPinMap = {}
+  if (Array.isArray(productsData)) {
+    productsData.forEach((p) => {
+      const name = p.vendor?.brandName || p.brand
+      if (!name) return
+      const pinned = Boolean(p.vendorIsPinned || p.vendor?.isPinned)
+      // once pinned=true for a brand keep it true
+      brandPinMap[name] = brandPinMap[name] || pinned
+    })
+  }
+
+  const safeBrands = Array.from(new Set([...brandNamesFromBrands, ...brandNamesFromProducts])).sort((a, b) => {
+    const pa = brandPinMap[a] ? 1 : 0
+    const pb = brandPinMap[b] ? 1 : 0
+    if (pa !== pb) return pb - pa
+    return a.localeCompare(b)
+  })
   const brandProducts = currentBrand ? productsData.filter((product) => product.brand === currentBrand) : []
   const [searchBrand, setSearchBrand] = useState('')
   const filteredBrands = safeBrands.filter((brand) => brand.toLowerCase().includes(searchBrand.toLowerCase()))
