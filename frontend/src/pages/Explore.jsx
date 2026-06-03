@@ -21,6 +21,8 @@ const NAV_LINKS = [
 
 const cx = (...classes) => classes.filter(Boolean).join(' ')
 
+const normalizeBrandName = (value) => (value || '').trim().toLowerCase()
+
 export default function Explore() {
   const { theme } = useTheme()
   const isDark = theme === 'dark'
@@ -57,7 +59,13 @@ export default function Explore() {
     if (pa !== pb) return pb - pa
     return a.localeCompare(b)
   })
-  const brandProducts = currentBrand ? productsData.filter((product) => product.brand === currentBrand) : []
+
+  const brandProducts = currentBrand
+    ? productsData.filter((product) => {
+        const productBrand = product.brand || product.vendor?.brandName || product.vendor?.name || ''
+        return normalizeBrandName(productBrand) === normalizeBrandName(currentBrand)
+      })
+    : []
   const [searchBrand, setSearchBrand] = useState('')
   const filteredBrands = safeBrands.filter((brand) => brand.toLowerCase().includes(searchBrand.toLowerCase()))
   const pageClass = isDark ? 'bg-slate-950 text-slate-100' : 'bg-slate-50 text-slate-950'
@@ -67,13 +75,16 @@ export default function Explore() {
 
   useEffect(() => {
     if (brandName) {
-      // If brandName is in URL params, use it
-      setCurrentBrand(decodeURIComponent(brandName))
-    } else if (safeBrands.length > 0 && !currentBrand) {
-      // Otherwise, set to first brand
-      setCurrentBrand(safeBrands[0])
-    } else if (currentBrand && !safeBrands.includes(currentBrand)) {
-      // If current brand not in list, reset to first
+      const decodedBrand = decodeURIComponent(brandName).trim()
+      const matchedBrand = safeBrands.find((brand) => normalizeBrandName(brand) === normalizeBrandName(decodedBrand))
+
+      if (matchedBrand) {
+        setCurrentBrand(matchedBrand)
+        return
+      }
+    }
+
+    if (safeBrands.length > 0 && (!currentBrand || !safeBrands.some((brand) => normalizeBrandName(brand) === normalizeBrandName(currentBrand)))) {
       setCurrentBrand(safeBrands[0])
     }
   }, [safeBrands, brandName, currentBrand])
