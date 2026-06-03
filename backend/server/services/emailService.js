@@ -100,6 +100,22 @@ export const sendPasswordResetConfirmation = async (user) => {
     });
 };
 
+export const sendGeneralReminderEmail = async (user, { headline, message, ctaUrl, ctaText, imageUrl } = {}) => {
+    return safeSendEmail({
+        to: user.email,
+        subject: "Reminder from CampusThread",
+        template: "general-reminder",
+        context: {
+            name: user.name,
+            headline: headline || "A quick reminder from CampusThread",
+            message: message || "This is a friendly reminder from CampusThread. Please take a look when you have a moment.",
+            ctaUrl: ctaUrl || `${appUrl}`,
+            ctaText: ctaText || "Open CampusThread",
+            imageUrl,
+        },
+    });
+};
+
 export const sendBuyerPromotionEmail = async (buyer, { headline, message, ctaUrl, ctaText, imageUrl } = {}) => {
     return safeSendEmail({
         to: buyer.email,

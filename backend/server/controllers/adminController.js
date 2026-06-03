@@ -275,6 +275,16 @@ export const sendReminderEmails = async (req, res) => {
 
     const results = await Promise.allSettled(
       users.map((user) => {
+        if (normalizedAudience === 'all') {
+          return emailService.sendGeneralReminderEmail(user, {
+            headline,
+            message,
+            ctaUrl,
+            ctaText,
+            imageUrl,
+          });
+        }
+
         if (user.role === 'vendor') {
           return emailService.sendVendorUploadReminderEmail(user, {
             headline,

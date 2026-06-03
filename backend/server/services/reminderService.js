@@ -2,6 +2,7 @@ import User from "../models/User.js";
 import { logger } from "../utils/logger.js";
 import {
   sendBuyerPromotionEmail,
+  sendGeneralReminderEmail,
   sendVendorUploadReminderEmail,
 } from "./emailService.js";
 
@@ -53,6 +54,10 @@ export const sendReminderCampaign = async ({ audience = "all", headline, message
         message: message || defaultContent.message,
         ctaUrl: ctaUrl || defaultContent.ctaUrl,
       };
+      if (audience === "all") {
+        return sendGeneralReminderEmail(user, content);
+      }
+
       return user.role === "vendor"
         ? sendVendorUploadReminderEmail(user, content)
         : sendBuyerPromotionEmail(user, content);
