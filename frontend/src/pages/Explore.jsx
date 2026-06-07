@@ -62,9 +62,9 @@ export default function Explore() {
 
   const brandProducts = currentBrand
     ? productsData.filter((product) => {
-        const productBrand = product.brand || product.vendor?.brandName || product.vendor?.name || ''
-        return normalizeBrandName(productBrand) === normalizeBrandName(currentBrand)
-      })
+      const productBrand = product.brand || product.vendor?.brandName || product.vendor?.name || ''
+      return normalizeBrandName(productBrand) === normalizeBrandName(currentBrand)
+    })
     : []
   const [searchBrand, setSearchBrand] = useState('')
   const filteredBrands = safeBrands.filter((brand) => brand.toLowerCase().includes(searchBrand.toLowerCase()))
