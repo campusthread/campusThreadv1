@@ -410,7 +410,8 @@ export const verifyPayment = async (req, res) => {
     // Ensure transaction was successful and amount matches order
     const expectedAmount = Math.round((order.totalAmount || 0) * 100);
     if (tx.status === 'success' && Number(tx.amount) === Number(expectedAmount)) {
-      if (order.paymentStatus === 'paid') {
+      const wasPaid = order.paymentStatus === 'paid';
+      if (wasPaid) {
         logger.info('Payment already marked as paid', { reference, orderNumber: order.orderNumber });
       } else {
         order.paymentStatus = 'paid';
@@ -427,10 +428,23 @@ export const verifyPayment = async (req, res) => {
       (async () => {
         try {
           const buyer = await User.findById(order.buyer).select('name email');
+          const vendorIds = [...new Set((order.items || []).map((item) => String(item.vendor)).filter(Boolean))];
+          const vendors = vendorIds.length > 0
+            ? await User.find({ _id: { $in: vendorIds } }).select('name email brandName')
+            : [];
+
           if (buyer) {
-            await emailService.sendOrderStatusUpdateEmail(order, buyer);
-            logger.info('Sent payment verified email', { to: buyer.email, orderNumber: order.orderNumber });
+            await emailService.sendBuyerOrderConfirmation(order, buyer);
+            logger.info('Sent buyer order confirmation email', { to: buyer.email, orderNumber: order.orderNumber });
           }
+
+          await Promise.all(
+            vendors.map((vendor) => {
+              const vendorItems = (order.items || []).filter((item) => String(item.vendor) === String(vendor._id));
+              return emailService.sendVendorOrderNotification(vendor, order, vendorItems, buyer?.name || 'Customer');
+            }),
+          );
+          logger.info('Sent vendor order notifications', { orderNumber: order.orderNumber, vendorCount: vendors.length });
         } catch (err) {
           logger.error('Payment verification email failed', { orderNumber: order.orderNumber, message: err?.message });
         }

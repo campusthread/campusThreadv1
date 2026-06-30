@@ -99,8 +99,8 @@ export default function Navbar({ links = [], cta }) {
 
   return (
     <header className={cx('sticky top-0 z-50 border-b backdrop-blur-xl', isDark ? 'border-white/10 bg-slate-950/90' : 'border-slate-200 bg-white/90')}>
-      <nav className="mx-auto flex min-h-16 max-w-7xl items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
-        <Link to="/" className="text-xl font-black uppercase tracking-normal text-violet-700" onClick={closeMenu}>
+      <nav className="mx-auto flex min-h-16 max-w-7xl items-center justify-between gap-3 px-4 sm:px-6 lg:px-8">
+        <Link to="/" className="shrink-0 whitespace-nowrap text-sm font-black uppercase tracking-normal text-violet-700 sm:text-xl" onClick={closeMenu}>
           Campus<span className={isDark ? 'text-slate-100' : 'text-slate-950'}>Thread</span>
         </Link>
 

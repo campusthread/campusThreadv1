@@ -44,7 +44,7 @@ export const getVendorDashboard = async (req, res) => {
     try {
         const vendorId = req.user._id;
         const orders = await Order.find({ 'items.vendor': vendorId, paymentStatus: 'paid' })
-            .populate('buyer', 'name email')
+            .populate('buyer', 'name email phone')
             .populate('items.product', 'name')
             .populate('items.vendor', 'name brandName')
             .sort({ createdAt: -1 })
