@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
-import { LogOut, Menu, Moon, Sun, UserCircle, X } from 'lucide-react'
+import { Compass, Heart, Home, LogOut, Moon, ShoppingBag, ShoppingCart, Sun, UserCircle } from 'lucide-react'
 import { useTheme } from '../context/ThemeContext'
 import { useAuth } from '../context/AuthContext'
 
@@ -15,6 +15,20 @@ export default function Navbar({ links = [], cta }) {
   const isDark = theme === 'dark'
 
   const closeMenu = () => setMenuOpen(false)
+
+  const isActivePath = (path) => {
+    if (!path || path === '/') return location.pathname === '/'
+    if (location.pathname === path) return true
+    return location.pathname.startsWith(`${path}/`)
+  }
+
+  const primaryTabMap = {
+    '/': { label: 'Home', icon: Home },
+    '/shop': { label: 'Shop', icon: ShoppingBag },
+    '/explore': { label: 'Explore', icon: Compass },
+    '/cart': { label: 'Cart', icon: ShoppingCart },
+    '/favorites': { label: 'Favorites', icon: Heart },
+  }
 
   const linkClass = (link) => {
     const path = link.path || link.to
@@ -96,6 +110,25 @@ export default function Navbar({ links = [], cta }) {
   }
 
   const allLinks = [...links, ...roleLinks]
+  const primaryNavLinks = allLinks.filter((link) => {
+    const path = link.path || link.to || link.href || ''
+    const label = (link.label || '').toLowerCase()
+    return ['/', '/shop', '/explore', '/cart', '/favorites'].includes(path) || ['home', 'shop', 'explore', 'cart', 'favorites'].includes(label)
+  })
+  const secondaryNavLinks = allLinks.filter((link) => !primaryNavLinks.includes(link))
+
+  const bottomNavLinks = primaryNavLinks.length > 0
+    ? primaryNavLinks.map((link) => {
+      const path = link.path || link.to || link.href || '/'
+      const preset = primaryTabMap[path] || primaryTabMap[path.toLowerCase()]
+      return {
+        ...link,
+        path,
+        label: preset?.label || link.label || 'Home',
+        icon: preset?.icon || Home,
+      }
+    })
+    : Object.entries(primaryTabMap).map(([path, config]) => ({ path, label: config.label, icon: config.icon }))
 
   return (
     <header className={cx('sticky top-0 z-50 border-b backdrop-blur-xl', isDark ? 'border-white/10 bg-slate-950/90' : 'border-slate-200 bg-white/90')}>
@@ -105,7 +138,7 @@ export default function Navbar({ links = [], cta }) {
         </Link>
 
         <div className="hidden items-center gap-1 md:flex">
-          {allLinks.map((link) => renderLink(link))}
+          {secondaryNavLinks.map((link) => renderLink(link))}
           {renderCta()}
         </div>
 
@@ -146,17 +179,37 @@ export default function Navbar({ links = [], cta }) {
             </>
           )}
 
-          <button
-            type="button"
-            className={cx('inline-flex h-10 w-10 items-center justify-center rounded-lg md:hidden', isDark ? 'bg-slate-800 text-slate-100' : 'bg-slate-100 text-slate-900')}
-            onClick={() => setMenuOpen((open) => !open)}
-            aria-label="Toggle navigation menu"
-            aria-expanded={menuOpen}
-          >
-            {menuOpen ? <X size={20} /> : <Menu size={20} />}
-          </button>
         </div>
       </nav>
+
+      <div className="fixed inset-x-0 bottom-0 z-[60] border-t px-2 pb-[max(0.6rem,env(safe-area-inset-bottom))] pt-2 shadow-[0_-8px_24px_rgba(0,0,0,0.12)] md:hidden" style={{ backgroundColor: isDark ? 'rgba(2, 6, 23, 0.96)' : 'rgba(255, 255, 255, 0.96)' }}>
+        <div className="mx-auto flex max-w-7xl items-center justify-around gap-1">
+          {bottomNavLinks.map(({ path, label, icon: Icon }) => {
+            const active = isActivePath(path)
+            return (
+              <Link
+                key={path}
+                to={path}
+                className={cx(
+                  'flex min-w-0 flex-1 flex-col items-center justify-center rounded-xl px-1 py-2 text-[10px] font-semibold transition',
+                  active
+                    ? 'bg-violet-600/10 text-violet-600'
+                    : isDark
+                      ? 'text-slate-400 hover:bg-slate-800 hover:text-slate-100'
+                      : 'text-slate-500 hover:bg-slate-100 hover:text-violet-700',
+                )}
+                onClick={closeMenu}
+              >
+                <Icon size={18} />
+                <span className="mt-1 leading-none">{label}</span>
+              </Link>
+            )
+          })}
+
+        </div>
+      </div>
+
+      <div className="h-20 md:hidden" />
 
       {menuOpen && (
         <div className={cx('border-t px-4 py-3 md:hidden', isDark ? 'border-white/10 bg-slate-950' : 'border-slate-200 bg-white')}>
