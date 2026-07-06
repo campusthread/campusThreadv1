@@ -130,7 +130,10 @@ export default function Navbar({ links = [], cta }) {
     const label = (link.label || '').toLowerCase()
     return ['/', '/shop', '/explore', '/vendors', '/cart', '/favorites'].includes(path) || ['home', 'shop', 'explore', 'vendors', 'cart', 'favorites'].includes(label)
   })
-  const secondaryNavLinks = allLinks.filter((link) => !primaryNavLinks.includes(link))
+  const secondaryNavLinks = allLinks.filter((link) => {
+    const path = link.path || link.to || link.href || ''
+    return !primaryNavLinks.includes(link) && !desktopNavLinks.some((desktopLink) => desktopLink.path === path)
+  })
 
   const baseBottomNavLinks = primaryNavLinks.length > 0
     ? primaryNavLinks.map((link) => {
@@ -156,57 +159,59 @@ export default function Navbar({ links = [], cta }) {
   ]
 
   return (
-    <header className={cx('sticky top-0 z-50 border-b backdrop-blur-xl', isDark ? 'border-white/10 bg-slate-950/90' : 'border-slate-200 bg-white/90')}>
-      <nav className="mx-auto flex min-h-16 max-w-7xl items-center justify-between gap-3 px-4 sm:px-6 lg:px-8">
-        <Link to="/" className="shrink-0 whitespace-nowrap text-sm font-black uppercase tracking-normal text-violet-700 sm:text-xl" onClick={closeMenu}>
-          Campus<span className={isDark ? 'text-slate-100' : 'text-slate-950'}>Thread</span>
-        </Link>
+    <>
+      <header className={cx('sticky top-0 z-50 border-b backdrop-blur-xl', isDark ? 'border-white/10 bg-slate-950/90' : 'border-slate-200 bg-white/90')}>
+        <nav className="mx-auto flex min-h-16 max-w-7xl items-center justify-between gap-3 px-4 sm:px-6 lg:px-8">
+          <Link to="/" className="shrink-0 whitespace-nowrap text-sm font-black uppercase tracking-normal text-violet-700 sm:text-xl" onClick={closeMenu}>
+            Campus<span className={isDark ? 'text-slate-100' : 'text-slate-950'}>Thread</span>
+          </Link>
 
-        <div className="hidden items-center gap-1 md:flex">
-          {desktopNavLinks.map((link) => renderLink(link))}
-          {secondaryNavLinks.map((link) => renderLink(link))}
-          {renderCta()}
-        </div>
+          <div className="hidden items-center gap-1 md:flex">
+            {desktopNavLinks.map((link) => renderLink(link))}
+            {secondaryNavLinks.map((link) => renderLink(link))}
+            {renderCta()}
+          </div>
 
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            className={cx('inline-flex h-10 w-10 items-center justify-center rounded-lg transition', isDark ? 'bg-slate-800 text-amber-200 hover:bg-slate-700' : 'bg-slate-100 text-slate-700 hover:bg-violet-100')}
-            onClick={toggleTheme}
-            title="Toggle Dark Mode"
-            aria-label="Toggle Dark Mode"
-          >
-            {isDark ? <Sun size={18} /> : <Moon size={18} />}
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              className={cx('inline-flex h-10 w-10 items-center justify-center rounded-lg transition', isDark ? 'bg-slate-800 text-amber-200 hover:bg-slate-700' : 'bg-slate-100 text-slate-700 hover:bg-violet-100')}
+              onClick={toggleTheme}
+              title="Toggle Dark Mode"
+              aria-label="Toggle Dark Mode"
+            >
+              {isDark ? <Sun size={18} /> : <Moon size={18} />}
+            </button>
 
-          {isAuthenticated && (
-            <>
-              <button
-                type="button"
-                className={cx('inline-flex h-10 w-10 items-center justify-center rounded-lg transition', isDark ? 'bg-slate-800 text-slate-100 hover:bg-slate-700' : 'bg-slate-100 text-slate-700 hover:bg-violet-100')}
-                onClick={() => navigate('/profile')}
-                title="Profile"
-                aria-label="Profile"
-              >
-                <UserCircle size={18} />
-              </button>
-              <button
-                type="button"
-                className={cx('inline-flex h-10 w-10 items-center justify-center rounded-lg transition', isDark ? 'bg-slate-800 text-slate-100 hover:bg-slate-700' : 'bg-slate-100 text-slate-700 hover:bg-violet-100')}
-                onClick={async () => {
-                  await logout()
-                  navigate('/auth')
-                }}
-                title="Logout"
-                aria-label="Logout"
-              >
-                <LogOut size={18} />
-              </button>
-            </>
-          )}
+            {isAuthenticated && (
+              <>
+                <button
+                  type="button"
+                  className={cx('inline-flex h-10 w-10 items-center justify-center rounded-lg transition', isDark ? 'bg-slate-800 text-slate-100 hover:bg-slate-700' : 'bg-slate-100 text-slate-700 hover:bg-violet-100')}
+                  onClick={() => navigate('/profile')}
+                  title="Profile"
+                  aria-label="Profile"
+                >
+                  <UserCircle size={18} />
+                </button>
+                <button
+                  type="button"
+                  className={cx('inline-flex h-10 w-10 items-center justify-center rounded-lg transition', isDark ? 'bg-slate-800 text-slate-100 hover:bg-slate-700' : 'bg-slate-100 text-slate-700 hover:bg-violet-100')}
+                  onClick={async () => {
+                    await logout()
+                    navigate('/auth')
+                  }}
+                  title="Logout"
+                  aria-label="Logout"
+                >
+                  <LogOut size={18} />
+                </button>
+              </>
+            )}
 
-        </div>
-      </nav>
+          </div>
+        </nav>
+      </header>
 
       <div className="fixed inset-x-0 bottom-0 z-[60] border-t px-1.5 pb-[max(0.7rem,env(safe-area-inset-bottom))] pt-2 shadow-[0_-8px_24px_rgba(0,0,0,0.12)] md:hidden" style={{ backgroundColor: isDark ? 'rgba(2, 6, 23, 0.96)' : 'rgba(255, 255, 255, 0.96)' }}>
         <div className="mx-auto flex max-w-7xl items-center justify-around gap-1.5">
@@ -245,6 +250,6 @@ export default function Navbar({ links = [], cta }) {
           </div>
         </div>
       )}
-    </header>
+    </>
   )
 }
