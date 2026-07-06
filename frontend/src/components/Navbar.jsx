@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
-import { Compass, Heart, Home, LogOut, Moon, ShoppingBag, ShoppingCart, Store, Sun, UserCircle } from 'lucide-react'
+import { Compass, Heart, Home, LayoutGrid, LogOut, Moon, ShoppingBag, ShoppingCart, Store, Sun, UserCircle } from 'lucide-react'
 import { useTheme } from '../context/ThemeContext'
 import { useAuth } from '../context/AuthContext'
 
@@ -104,11 +104,25 @@ export default function Navbar({ links = [], cta }) {
 
   const roleLinks = []
   if (isAuthenticated && user?.role === 'vendor') {
-    roleLinks.push({ path: '/vendor-admin', label: 'Vendor Studio' })
+    roleLinks.push({ path: '/vendor-admin', label: 'Vendor Dashboard' })
   }
   if (isAuthenticated && user?.role === 'admin') {
     roleLinks.push({ path: '/super-admin', label: 'Admin Dashboard' })
   }
+
+  const standardDesktopLinks = [
+    { path: '/', label: 'Home' },
+    { path: '/shop', label: 'Shop' },
+    { path: '/explore', label: 'Explore' },
+    { path: '/cart', label: 'Cart' },
+    { path: '/favorites', label: 'Favorites' },
+  ]
+
+  const desktopNavLinks = [
+    ...standardDesktopLinks,
+    ...(isAuthenticated && user?.role === 'vendor' ? [{ path: '/vendor-admin', label: 'Dashboard' }] : []),
+    ...(isAuthenticated && user?.role === 'admin' ? [{ path: '/super-admin', label: 'Admin' }] : []),
+  ]
 
   const allLinks = [...links, ...roleLinks]
   const primaryNavLinks = allLinks.filter((link) => {
@@ -118,7 +132,7 @@ export default function Navbar({ links = [], cta }) {
   })
   const secondaryNavLinks = allLinks.filter((link) => !primaryNavLinks.includes(link))
 
-  const bottomNavLinks = primaryNavLinks.length > 0
+  const baseBottomNavLinks = primaryNavLinks.length > 0
     ? primaryNavLinks.map((link) => {
       const path = link.path || link.to || link.href || '/'
       const preset = primaryTabMap[path] || primaryTabMap[path.toLowerCase()]
@@ -131,6 +145,16 @@ export default function Navbar({ links = [], cta }) {
     })
     : Object.entries(primaryTabMap).map(([path, config]) => ({ path, label: config.label, icon: config.icon }))
 
+  const bottomNavLinks = [
+    ...baseBottomNavLinks,
+    ...(isAuthenticated && user?.role === 'admin'
+      ? [{ path: '/super-admin', label: 'Admin', icon: LayoutGrid }]
+      : []),
+    ...(isAuthenticated && user?.role === 'vendor'
+      ? [{ path: '/vendor-admin', label: 'Dashboard', icon: Store }]
+      : []),
+  ]
+
   return (
     <header className={cx('sticky top-0 z-50 border-b backdrop-blur-xl', isDark ? 'border-white/10 bg-slate-950/90' : 'border-slate-200 bg-white/90')}>
       <nav className="mx-auto flex min-h-16 max-w-7xl items-center justify-between gap-3 px-4 sm:px-6 lg:px-8">
@@ -139,6 +163,7 @@ export default function Navbar({ links = [], cta }) {
         </Link>
 
         <div className="hidden items-center gap-1 md:flex">
+          {desktopNavLinks.map((link) => renderLink(link))}
           {secondaryNavLinks.map((link) => renderLink(link))}
           {renderCta()}
         </div>
@@ -183,8 +208,8 @@ export default function Navbar({ links = [], cta }) {
         </div>
       </nav>
 
-      <div className="fixed inset-x-0 bottom-0 z-[60] border-t px-2 pb-[max(0.6rem,env(safe-area-inset-bottom))] pt-2 shadow-[0_-8px_24px_rgba(0,0,0,0.12)] md:hidden" style={{ backgroundColor: isDark ? 'rgba(2, 6, 23, 0.96)' : 'rgba(255, 255, 255, 0.96)' }}>
-        <div className="mx-auto flex max-w-7xl items-center justify-around gap-1">
+      <div className="fixed inset-x-0 bottom-0 z-[60] border-t px-1.5 pb-[max(0.7rem,env(safe-area-inset-bottom))] pt-2 shadow-[0_-8px_24px_rgba(0,0,0,0.12)] md:hidden" style={{ backgroundColor: isDark ? 'rgba(2, 6, 23, 0.96)' : 'rgba(255, 255, 255, 0.96)' }}>
+        <div className="mx-auto flex max-w-7xl items-center justify-around gap-1.5">
           {bottomNavLinks.map(({ path, label, icon: Icon }) => {
             const active = isActivePath(path)
             return (
@@ -192,7 +217,7 @@ export default function Navbar({ links = [], cta }) {
                 key={path}
                 to={path}
                 className={cx(
-                  'flex min-w-0 flex-1 flex-col items-center justify-center rounded-xl px-1 py-2 text-[10px] font-semibold transition',
+                  'flex min-w-0 flex-1 flex-col items-center justify-center rounded-2xl px-1.5 py-3 text-[10px] font-semibold transition min-h-[56px]',
                   active
                     ? 'bg-violet-600/10 text-violet-600'
                     : isDark
