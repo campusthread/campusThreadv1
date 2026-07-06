@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
-import { Compass, Heart, Home, LogOut, Moon, ShoppingBag, ShoppingCart, Sun, UserCircle } from 'lucide-react'
+import { Compass, Heart, Home, LogOut, Moon, ShoppingBag, ShoppingCart, Store, Sun, UserCircle } from 'lucide-react'
 import { useTheme } from '../context/ThemeContext'
 import { useAuth } from '../context/AuthContext'
 
@@ -26,6 +26,7 @@ export default function Navbar({ links = [], cta }) {
     '/': { label: 'Home', icon: Home },
     '/shop': { label: 'Shop', icon: ShoppingBag },
     '/explore': { label: 'Explore', icon: Compass },
+    '/vendors': { label: 'Vendors', icon: Store },
     '/cart': { label: 'Cart', icon: ShoppingCart },
     '/favorites': { label: 'Favorites', icon: Heart },
   }
@@ -113,7 +114,7 @@ export default function Navbar({ links = [], cta }) {
   const primaryNavLinks = allLinks.filter((link) => {
     const path = link.path || link.to || link.href || ''
     const label = (link.label || '').toLowerCase()
-    return ['/', '/shop', '/explore', '/cart', '/favorites'].includes(path) || ['home', 'shop', 'explore', 'cart', 'favorites'].includes(label)
+    return ['/', '/shop', '/explore', '/vendors', '/cart', '/favorites'].includes(path) || ['home', 'shop', 'explore', 'vendors', 'cart', 'favorites'].includes(label)
   })
   const secondaryNavLinks = allLinks.filter((link) => !primaryNavLinks.includes(link))
 
