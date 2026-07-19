@@ -13,6 +13,7 @@ import {
   SlidersHorizontal,
   Store,
   User,
+  X,
 } from 'lucide-react'
 import Carousel from '../components/Carousel'
 import Navbar from '../components/Navbar'
@@ -23,6 +24,7 @@ import { useNotification } from '../hooks/useNotification'
 import { useGetProductsQuery } from '../redux/slices/productApiSlice'
 import { useGetBrandsQuery } from '../redux/slices/brandApiSlice'
 import { useGetCategoriesQuery } from '../redux/slices/categoryApiSlice'
+import { useGetAdsQuery } from '../redux/slices/adApiSlice'
 import { NIGERIAN_UNIVERSITIES } from '../utils/constants'
 
 const navLinks = [
@@ -51,10 +53,12 @@ export default function Shop() {
   const { data: productsData = [], error: productsError, isFetching: productsFetching } = useGetProductsQuery()
   const { data: brandsData = [], isFetching: brandsFetching } = useGetBrandsQuery()
   const { data: categoriesData = [], isFetching: categoriesFetching } = useGetCategoriesQuery()
+  const { data: adsData = [] } = useGetAdsQuery()
 
   const allProducts = useMemo(() => Array.isArray(productsData) ? productsData : [], [productsData])
   const brands = useMemo(() => Array.isArray(brandsData) ? brandsData.map(b => b.name) : [], [brandsData])
   const categories = useMemo(() => Array.isArray(categoriesData) ? categoriesData.map(c => c.name) : [], [categoriesData])
+  const ads = useMemo(() => Array.isArray(adsData) ? adsData : [], [adsData])
 
   const filtered = useMemo(() => {
     const sorted = [...allProducts].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
@@ -64,6 +68,8 @@ export default function Shop() {
   const [currentFiltered, setCurrentFiltered] = useState([])
   const [activeView, setActiveView] = useState('all')
   const [backendError, setBackendError] = useState(null)
+  const [showAdModal, setShowAdModal] = useState(false)
+  const [activeAdIndex, setActiveAdIndex] = useState(0)
 
   const [uniFilter, setUniFilter] = useState('')
   const [brandFilter, setBrandFilter] = useState('')
@@ -102,6 +108,23 @@ export default function Shop() {
       setBackendError(productsError?.data?.message || productsError?.error || 'Unable to load marketplace products')
     }
   }, [productsError])
+
+  useEffect(() => {
+    if (!ads.length) return
+
+    const storageKey = 'campusthread-shop-popup-shown'
+    const hasSeenPopup = window.sessionStorage.getItem(storageKey)
+    if (hasSeenPopup) return
+
+    const timer = window.setTimeout(() => {
+      setShowAdModal(true)
+      window.sessionStorage.setItem(storageKey, 'true')
+    }, 700)
+
+    return () => window.clearTimeout(timer)
+  }, [ads.length])
+
+  const activeAd = ads.length ? ads[activeAdIndex % ads.length] : null
 
   const applyFilters = () => {
     const maxPrice = parseFloat(priceFilter) || Infinity
@@ -165,6 +188,39 @@ export default function Shop() {
     <div className={cx('min-h-screen transition-colors duration-300', pageClass)}>
       <NotificationToast notifications={notifications} />
       <Navbar links={navLinks} />
+
+      {showAdModal && activeAd ? (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/75 px-4 py-6 backdrop-blur-sm" onClick={() => setShowAdModal(false)}>
+          <div className={cx('relative w-full max-w-2xl overflow-hidden rounded-3xl border shadow-2xl', isDark ? 'border-white/10 bg-slate-900' : 'border-slate-200 bg-white')} onClick={(event) => event.stopPropagation()}>
+            <button type="button" onClick={() => setShowAdModal(false)} className={cx('absolute right-4 top-4 z-10 inline-flex h-10 w-10 items-center justify-center rounded-full border transition', isDark ? 'border-white/10 bg-slate-950/70 text-slate-100 hover:bg-slate-800' : 'border-slate-200 bg-white/85 text-slate-700 hover:bg-slate-100')} aria-label="Close ad popup">
+              <X size={18} />
+            </button>
+
+            <a href={activeAd.link || '/shop'} className="block" aria-label={activeAd.title}>
+              <img src={activeAd.imageUrl} alt={activeAd.title} className="h-64 w-full object-cover sm:h-80" />
+            </a>
+
+            <div className="p-6 sm:p-8">
+              <p className={cx('inline-flex rounded-full border px-3 py-1 text-xs font-black uppercase tracking-[0.24em]', isDark ? 'border-violet-300/20 bg-violet-300/10 text-violet-200' : 'border-violet-200 bg-violet-50 text-violet-700')}>
+                Featured offer
+              </p>
+              <h2 className="mt-4 text-2xl font-black tracking-normal">{activeAd.title}</h2>
+              <p className={cx('mt-3 text-sm leading-7', mutedText)}>{activeAd.description}</p>
+
+              <div className="mt-6 flex flex-wrap gap-3">
+                <a href={activeAd.link || '/shop'} className="inline-flex items-center justify-center rounded-lg bg-violet-700 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-violet-800">
+                  {activeAd.ctaText || 'Learn more'}
+                </a>
+                {ads.length > 1 ? (
+                  <button type="button" onClick={() => setActiveAdIndex((current) => (current + 1) % ads.length)} className={cx('rounded-lg border px-4 py-2.5 text-sm font-bold transition', isDark ? 'border-white/10 text-slate-200 hover:bg-white/5' : 'border-slate-200 text-slate-700 hover:bg-slate-100')}>
+                    Next ad
+                  </button>
+                ) : null}
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
         <section className="grid gap-8 border-b border-slate-200/70 pb-8 dark:border-white/10 lg:grid-cols-[1.3fr_0.7fr]">
