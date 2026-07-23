@@ -1,0 +1,18 @@
+stages:
+  - build
+
+build_frontend:
+  stage: build
+  image: node:20-alpine
+  cache:
+    key:
+      files:
+        - frontend/package.json
+        - frontend/package-lock.json
+    paths:
+      - frontend/node_modules/
+  before_script:
+    - cd frontend
+    - npm install --no-audit --no-fund
+  script:
+    - npm run build
