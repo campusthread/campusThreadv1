@@ -12,6 +12,7 @@ import { useGetCategoriesQuery } from '../redux/slices/categoryApiSlice'
 
 const tabs = [
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
+  { id: 'analytics', label: 'Analytics', icon: TrendingUp },
   { id: 'profile', label: 'Store Profile', icon: UserCircle2 },
   { id: 'products', label: 'Products', icon: ShoppingBag },
   { id: 'orders', label: 'Orders', icon: Receipt },
@@ -125,6 +126,90 @@ export default function VendorAdmin() {
       return String(itemVendor) === String(vendorId)
     })
   }
+
+  const analytics = useMemo(() => {
+    const paidOrders = orders.filter((order) => order.paymentStatus === 'paid')
+    const vendorItemsList = paidOrders.map((order) => ({ order, items: getVendorOrderItems(order) }))
+    const revenue = vendorItemsList.reduce((sum, entry) => sum + entry.items.reduce((itemSum, item) => itemSum + (item.price || 0) * (item.quantity || 0), 0), 0)
+    const totalOrders = orders.length
+    const paidCount = paidOrders.length
+    const conversionRate = totalOrders > 0 ? Number(((paidCount / totalOrders) * 100).toFixed(1)) : 0
+    const totalUnitsSold = vendorItemsList.reduce((sum, entry) => sum + entry.items.reduce((itemSum, item) => itemSum + (item.quantity || 0), 0), 0)
+    const avgOrderValue = paidCount > 0 ? revenue / paidCount : 0
+
+    const monthLabels = Array.from({ length: 6 }, (_, index) => {
+      const date = new Date()
+      date.setMonth(date.getMonth() - (5 - index))
+      return {
+        key: `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`,
+        label: date.toLocaleString('en', { month: 'short' }),
+        revenue: 0,
+      }
+    })
+
+    vendorItemsList.forEach(({ order, items }) => {
+      const createdAt = order.createdAt ? new Date(order.createdAt) : null
+      if (!createdAt) return
+      const key = `${createdAt.getFullYear()}-${String(createdAt.getMonth() + 1).padStart(2, '0')}`
+      const monthBucket = monthLabels.find((entry) => entry.key === key)
+      if (!monthBucket) return
+      monthBucket.revenue += items.reduce((sum, item) => sum + (item.price || 0) * (item.quantity || 0), 0)
+    })
+
+    const productLookup = new Map(products.map((product) => [String(product._id), product]))
+    const productSales = new Map()
+    vendorItemsList.forEach(({ items }) => {
+      items.forEach((item) => {
+        const productId = String(item.product?._id || item.product || '')
+        const productMeta = productLookup.get(productId) || null
+        const key = productId || item.name
+        const entry = productSales.get(key) || { name: item.name || productMeta?.name || 'Unknown product', revenue: 0, units: 0, category: productMeta?.category || 'Uncategorized' }
+        entry.revenue += (item.price || 0) * (item.quantity || 0)
+        entry.units += item.quantity || 0
+        productSales.set(key, entry)
+      })
+    })
+
+    const topProducts = Array.from(productSales.values())
+      .sort((a, b) => b.revenue - a.revenue)
+      .slice(0, 5)
+
+    const categorySales = new Map()
+    vendorItemsList.forEach(({ items }) => {
+      items.forEach((item) => {
+        const productId = String(item.product?._id || item.product || '')
+        const productMeta = productLookup.get(productId) || null
+        const categoryName = productMeta?.category || 'Uncategorized'
+        const entry = categorySales.get(categoryName) || { category: categoryName, revenue: 0, units: 0 }
+        entry.revenue += (item.price || 0) * (item.quantity || 0)
+        entry.units += item.quantity || 0
+        categorySales.set(categoryName, entry)
+      })
+    })
+
+    const bestCategories = Array.from(categorySales.values())
+      .sort((a, b) => b.revenue - a.revenue)
+      .slice(0, 4)
+
+    const maxMonthRevenue = Math.max(...monthLabels.map((entry) => entry.revenue), 1)
+    const maxProductRevenue = Math.max(...topProducts.map((product) => product.revenue), 1)
+    const maxCategoryRevenue = Math.max(...bestCategories.map((category) => category.revenue), 1)
+
+    return {
+      revenue,
+      totalOrders,
+      paidCount,
+      conversionRate,
+      totalUnitsSold,
+      avgOrderValue,
+      monthLabels,
+      topProducts,
+      bestCategories,
+      maxMonthRevenue,
+      maxProductRevenue,
+      maxCategoryRevenue,
+    }
+  }, [orders, products, vendorStats, user?._id, user?.id])
 
   const showTimedSuccess = (message) => {
     setSuccess(message)
@@ -487,6 +572,92 @@ export default function VendorAdmin() {
                     </Panel>
                   </section>
                 </>
+              )}
+
+              {activeTab === 'analytics' && (
+                <section className="grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
+                  <Panel title="Sales trend" surfaceClass={surfaceClass}>
+                    <div className="rounded-2xl border p-5" style={{ background: isDark ? 'rgba(15, 23, 42, 0.7)' : 'rgba(248, 250, 252, 0.9)' }}>
+                      <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
+                        <div>
+                          <p className={cx('text-xs font-black uppercase tracking-[0.3em]', isDark ? 'text-violet-200' : 'text-violet-700')}>Revenue overview</p>
+                          <p className="text-3xl font-black tracking-tight">{formatCurrency(analytics.revenue)}</p>
+                        </div>
+                        <div className={cx('rounded-full border px-3 py-1 text-sm font-semibold', isDark ? 'border-white/10 text-slate-300' : 'border-slate-200 text-slate-700')}>
+                          Last 6 months
+                        </div>
+                      </div>
+                      <div className="flex h-48 items-end gap-3">
+                        {analytics.monthLabels.map((entry) => (
+                          <div key={entry.key} className="flex flex-1 flex-col items-center gap-2">
+                            <div className="flex h-36 w-full items-end rounded-2xl bg-slate-200/70 p-1 dark:bg-slate-800/70">
+                              <div className="w-full rounded-xl bg-gradient-to-t from-violet-700 to-violet-400" style={{ height: `${Math.max((entry.revenue / analytics.maxMonthRevenue) * 100, entry.revenue > 0 ? 12 : 4)}%` }} />
+                            </div>
+                            <span className={cx('text-xs font-semibold', mutedText)}>{entry.label}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </Panel>
+
+                  <Panel title="Performance metrics" surfaceClass={surfaceClass}>
+                    <div className="space-y-3">
+                      <div className={cx('rounded-2xl border p-4', softClass)}>
+                        <p className={cx('text-xs font-black uppercase tracking-[0.25em]', mutedText)}>Conversion rate</p>
+                        <p className="mt-2 text-3xl font-black tracking-tight">{analytics.conversionRate}%</p>
+                        <p className={cx('mt-1 text-sm', mutedText)}>Paid orders compared with all orders received.</p>
+                      </div>
+                      <div className={cx('rounded-2xl border p-4', softClass)}>
+                        <p className={cx('text-xs font-black uppercase tracking-[0.25em]', mutedText)}>Average order value</p>
+                        <p className="mt-2 text-3xl font-black tracking-tight">{formatCurrency(analytics.avgOrderValue)}</p>
+                        <p className={cx('mt-1 text-sm', mutedText)}>Revenue per paid order.</p>
+                      </div>
+                      <div className={cx('rounded-2xl border p-4', softClass)}>
+                        <p className={cx('text-xs font-black uppercase tracking-[0.25em]', mutedText)}>Units sold</p>
+                        <p className="mt-2 text-3xl font-black tracking-tight">{analytics.totalUnitsSold}</p>
+                        <p className={cx('mt-1 text-sm', mutedText)}>Total units shipped through paid orders.</p>
+                      </div>
+                    </div>
+                  </Panel>
+
+                  <Panel title="Top products" surfaceClass={surfaceClass}>
+                    <div className="space-y-4">
+                      {analytics.topProducts.length > 0 ? analytics.topProducts.map((product) => (
+                        <div key={product.name} className="space-y-2">
+                          <div className="flex items-center justify-between gap-3">
+                            <div>
+                              <p className="font-semibold">{product.name}</p>
+                              <p className={cx('text-sm', mutedText)}>{product.units} units · {product.category}</p>
+                            </div>
+                            <span className="font-black text-violet-700">{formatCurrency(product.revenue)}</span>
+                          </div>
+                          <div className="h-2 rounded-full bg-slate-200 dark:bg-slate-800">
+                            <div className="h-2 rounded-full bg-violet-600" style={{ width: `${(product.revenue / analytics.maxProductRevenue) * 100}%` }} />
+                          </div>
+                        </div>
+                      )) : <p className={cx('text-sm', mutedText)}>No product sales yet.</p>}
+                    </div>
+                  </Panel>
+
+                  <Panel title="Best categories" surfaceClass={surfaceClass}>
+                    <div className="space-y-4">
+                      {analytics.bestCategories.length > 0 ? analytics.bestCategories.map((category) => (
+                        <div key={category.category} className="space-y-2">
+                          <div className="flex items-center justify-between gap-3">
+                            <div>
+                              <p className="font-semibold">{category.category}</p>
+                              <p className={cx('text-sm', mutedText)}>{category.units} units sold</p>
+                            </div>
+                            <span className="font-black text-violet-700">{formatCurrency(category.revenue)}</span>
+                          </div>
+                          <div className="h-2 rounded-full bg-slate-200 dark:bg-slate-800">
+                            <div className="h-2 rounded-full bg-violet-500" style={{ width: `${(category.revenue / analytics.maxCategoryRevenue) * 100}%` }} />
+                          </div>
+                        </div>
+                      )) : <p className={cx('text-sm', mutedText)}>No category sales yet.</p>}
+                    </div>
+                  </Panel>
+                </section>
               )}
 
               {activeTab === 'profile' && (

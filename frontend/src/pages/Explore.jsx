@@ -181,7 +181,7 @@ export default function Explore() {
                   <p className="mt-2">Try selecting another brand or check back later.</p>
                 </div>
               ) : (
-                <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                <div className="grid gap-4 grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                   {brandProducts.map((product) => (
                     <ProductCard key={product._id || product.id} product={product} isDark={isDark} surfaceClass={surfaceClass} mutedText={mutedText} onView={() => navigate(`/product/${product._id || product.id}`)} />
                   ))}
@@ -204,7 +204,7 @@ function ProductCard({ product, isDark, surfaceClass, mutedText, onView }) {
 
   return (
     <article className={cx('group overflow-hidden rounded-xl border shadow-lg transition hover:-translate-y-1 hover:shadow-xl', surfaceClass)}>
-      <div className={cx('relative h-48 md:h-56 lg:h-64 w-full overflow-hidden', isDark ? 'bg-slate-950' : 'bg-slate-100')}>
+      <div className={cx('relative h-40 w-full overflow-hidden sm:h-48 md:h-56 lg:h-64', isDark ? 'bg-slate-950' : 'bg-slate-100')}>
         {video ? (
           <video className="h-full w-full object-cover" controls>
             <source src={video} />
@@ -219,16 +219,16 @@ function ProductCard({ product, isDark, surfaceClass, mutedText, onView }) {
           </div>
         )}
       </div>
-      <div className="p-5">
-        <p className="text-xs font-black uppercase tracking-wide text-violet-700">{product.category || 'Uncategorized'}</p>
-        <h3 className="mt-2 line-clamp-2 text-lg font-black tracking-normal">{product.name}</h3>
-        <div className={cx('mt-3 grid gap-2 text-sm', mutedText)}>
-          <span className="flex items-center gap-2"><Store size={15} /> {product.brand || 'N/A'}</span>
-          <span className="flex items-center gap-2"><University size={15} /> {product.university || 'N/A'}</span>
+      <div className="p-3 sm:p-5">
+        <p className="text-[11px] font-black uppercase tracking-wide text-violet-700 sm:text-xs">{product.category || 'Uncategorized'}</p>
+        <h3 className="mt-2 line-clamp-2 text-base font-black tracking-normal sm:text-lg">{product.name}</h3>
+        <div className={cx('mt-2 grid gap-1.5 text-sm sm:mt-3 sm:gap-2', mutedText)}>
+          <span className="flex items-center gap-2 text-xs sm:text-sm"><Store size={14} className="shrink-0 sm:size-[15px]" /> {product.brand || 'N/A'}</span>
+          <span className="flex items-center gap-2 text-xs sm:text-sm"><University size={14} className="shrink-0 sm:size-[15px]" /> {product.university || 'N/A'}</span>
         </div>
-        <div className="mt-5 flex items-center justify-between gap-3">
-          <span className="text-xl font-black text-violet-700">NGN {parseFloat(product.price || 0).toLocaleString()}</span>
-          <button type="button" className="rounded-lg bg-violet-700 px-3 py-2 text-sm font-bold text-white transition hover:bg-violet-800" onClick={onView}>
+        <div className="mt-4 flex items-center justify-between gap-2 sm:mt-5 sm:gap-3">
+          <span className="text-base font-black text-violet-700 sm:text-xl">NGN {parseFloat(product.price || 0).toLocaleString()}</span>
+          <button type="button" className="rounded-lg bg-violet-700 px-2.5 py-2 text-xs font-bold text-white transition hover:bg-violet-800 sm:px-3 sm:py-2 sm:text-sm" onClick={onView}>
             View
           </button>
         </div>

@@ -19,6 +19,7 @@ import SuperAdmin from './pages/SuperAdmin'
 import SuperAdminVendors from './pages/SuperAdminVendors'
 import SuperAdminLogin from './pages/SuperAdminLogin'
 import SuperAdminRegister from './pages/SuperAdminRegister'
+import Game from './pages/Game'
 
 // Protected route component
 function ProtectedRoute({ children, requiredRole }) {
@@ -51,6 +52,7 @@ export default function App() {
               <Route path="/shop" element={<Shop />} />
               <Route path="/explore" element={<Explore />} />
               <Route path="/explore/:brandName" element={<Explore />} />
+              <Route path="/game" element={<Game />} />
               <Route path="/vendors" element={<Explore />} />
               <Route path="/expore" element={<Explore />} />
               <Route path="/expore/:brandName" element={<Explore />} />

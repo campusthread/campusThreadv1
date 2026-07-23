@@ -3,6 +3,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { Compass, Heart, Home, LayoutGrid, LogOut, Moon, ShoppingBag, ShoppingCart, Store, Sun, UserCircle } from 'lucide-react'
 import { useTheme } from '../context/ThemeContext'
 import { useAuth } from '../context/AuthContext'
+import { useGetCartQuery, useGetFavoritesQuery } from '../redux/slices/cartFavoritesApiSlice'
 
 const cx = (...classes) => classes.filter(Boolean).join(' ')
 
@@ -13,6 +14,11 @@ export default function Navbar({ links = [], cta }) {
   const location = useLocation()
   const navigate = useNavigate()
   const isDark = theme === 'dark'
+
+  const { data: cartData = [] } = useGetCartQuery(undefined, { skip: !isAuthenticated })
+  const { data: favoritesData = [] } = useGetFavoritesQuery(undefined, { skip: !isAuthenticated })
+  const cartCount = Array.isArray(cartData) ? cartData.length : 0
+  const favoriteCount = Array.isArray(favoritesData) ? favoritesData.length : 0
 
   const closeMenu = () => setMenuOpen(false)
 
@@ -44,8 +50,17 @@ export default function Navbar({ links = [], cta }) {
     )
   }
 
+  const renderBadge = (count) => count > 0 ? (
+    <span className="ml-2 inline-flex min-w-5 items-center justify-center rounded-full bg-red-500 px-1.5 py-0.5 text-[10px] font-black text-white">
+      {count > 9 ? '9+' : count}
+    </span>
+  ) : null
+
   const renderLink = (link, mobile = false) => {
     const className = cx(linkClass(link), mobile && 'block px-4 py-3 text-base')
+    const to = link.to || link.path || '/'
+    const badgeCount = to === '/cart' ? cartCount : to === '/favorites' ? favoriteCount : 0
+
     if (link.href) {
       const isExternal = link.href.startsWith('http')
       return (
@@ -57,15 +72,20 @@ export default function Navbar({ links = [], cta }) {
           rel={isExternal ? 'noopener noreferrer' : undefined}
           onClick={closeMenu}
         >
-          {link.label}
+          <span className="inline-flex items-center">
+            {link.label}
+            {renderBadge(badgeCount)}
+          </span>
         </a>
       )
     }
 
-    const to = link.to || link.path || '/'
     return (
       <Link key={link.label} to={to} className={className} onClick={closeMenu}>
-        {link.label}
+        <span className="inline-flex items-center">
+          {link.label}
+          {renderBadge(badgeCount)}
+        </span>
       </Link>
     )
   }
@@ -217,12 +237,13 @@ export default function Navbar({ links = [], cta }) {
         <div className="mx-auto flex max-w-7xl items-center justify-around gap-1.5">
           {bottomNavLinks.map(({ path, label, icon: Icon }) => {
             const active = isActivePath(path)
+            const badgeCount = path === '/cart' ? cartCount : path === '/favorites' ? favoriteCount : 0
             return (
               <Link
                 key={path}
                 to={path}
                 className={cx(
-                  'flex min-w-0 flex-1 flex-col items-center justify-center rounded-2xl px-1.5 py-3 text-[10px] font-semibold transition min-h-[56px]',
+                  'relative flex min-w-0 flex-1 flex-col items-center justify-center rounded-2xl px-1.5 py-3 text-[10px] font-semibold transition min-h-[56px]',
                   active
                     ? 'bg-violet-600/10 text-violet-600'
                     : isDark
@@ -231,7 +252,14 @@ export default function Navbar({ links = [], cta }) {
                 )}
                 onClick={closeMenu}
               >
-                <Icon size={18} />
+                <div className="relative">
+                  <Icon size={18} />
+                  {badgeCount > 0 && (
+                    <span className="absolute -right-2 -top-2 flex min-h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[9px] font-black text-white">
+                      {badgeCount > 9 ? '9+' : badgeCount}
+                    </span>
+                  )}
+                </div>
                 <span className="mt-1 leading-none">{label}</span>
               </Link>
             )
