@@ -3,7 +3,7 @@ stages:
 
 build_frontend:
   stage: build
-  image: node:20-alpine
+  image: node:22-bookworm-slim
   cache:
     key:
       files:
@@ -13,6 +13,6 @@ build_frontend:
       - frontend/node_modules/
   before_script:
     - cd frontend
-    - npm install --no-audit --no-fund
+    - npm ci --no-audit --no-fund
   script:
     - npm run build
