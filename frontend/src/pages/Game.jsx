@@ -1,446 +1,100 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
-import { Link } from 'react-router-dom'
-import { Coins, Gamepad2, Gift, Play, RotateCcw, Sparkles, Trophy } from 'lucide-react'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { AnimatePresence, motion } from 'framer-motion'
+import { gsap } from 'gsap'
+import { Howl } from 'howler'
+import { Coins, Pause, Play, RotateCcw, Settings2, Shield, Zap } from 'lucide-react'
 import Navbar from '../components/Navbar'
-import NotificationToast from '../components/NotificationToast'
 import { useTheme } from '../context/ThemeContext'
-import { useNotification } from '../hooks/useNotification'
 
-const cx = (...classes) => classes.filter(Boolean).join(' ')
+const NAV_LINKS = [{ path: '/', label: 'Home' }, { path: '/shop', label: 'Shop' }, { path: '/explore', label: 'Explore' }, { path: '/game', label: 'Game' }, { path: '/cart', label: 'Cart' }]
+const clamp = (value, min, max) => Math.min(max, Math.max(min, value))
+const random = (min, max) => Math.random() * (max - min) + min
+const TYPES = ['box', 'bench', 'cart', 'book', 'bike', 'cone', 'tree']
+const ITEMS = ['coin', 'bag', 'voucher', 'gift', 'magnet', 'shield', 'boost', 'double']
+const INITIAL = { score: 0, distance: 0, coins: 0, combo: 0, lives: 3, level: 1, progress: 0, mission: 0, highScore: 0, running: false, paused: false, over: false, shield: false, boost: false, double: false }
 
-const NAV_LINKS = [
-    { path: '/', label: 'Home' },
-    { path: '/shop', label: 'Shop' },
-    { path: '/explore', label: 'Explore' },
-    { path: '/game', label: 'Game' },
-    { path: '/cart', label: 'Cart' },
-    { path: '/favorites', label: 'Favorites' },
-]
+function makeTone(frequency, duration = 0.12) {
+    const sampleRate = 8000; const length = Math.floor(sampleRate * duration); const buffer = new ArrayBuffer(44 + length * 2); const view = new DataView(buffer)
+    const write = (offset, value) => view.setUint32(offset, value, true)
+    view.setUint32(0, 0x46464952, false); write(4, 36 + length * 2); view.setUint32(8, 0x45564157, false); view.setUint32(12, 0x20746d66, false); write(16, 16); view.setUint16(20, 1, true); view.setUint16(22, 1, true); write(24, sampleRate); write(28, sampleRate * 2); view.setUint16(32, 2, true); view.setUint16(34, 16, true); view.setUint32(36, 0x64617461, false); write(40, length * 2)
+    for (let i = 0; i < length; i += 1) view.setInt16(44 + i * 2, Math.sin(i * frequency * Math.PI * 2 / sampleRate) * 13000 * (1 - i / length), true)
+    return `data:audio/wav;base64,${btoa(String.fromCharCode(...new Uint8Array(buffer)))}`
+}
 
-const createObstacle = (id, x) => ({
-    id,
-    x,
-    type: Math.random() > 0.5 ? 'barrier' : 'cone',
-})
+function useGameAudio(volume) {
+    const sounds = useRef(null)
+    useEffect(() => {
+        sounds.current = { jump: new Howl({ src: [makeTone(520)] }), coin: new Howl({ src: [makeTone(920)] }), voucher: new Howl({ src: [makeTone(700, .25)] }), hit: new Howl({ src: [makeTone(130, .28)] }), click: new Howl({ src: [makeTone(390, .06)] }) }
+        return () => Object.values(sounds.current || {}).forEach(sound => sound.unload())
+    }, [])
+    useEffect(() => Object.values(sounds.current || {}).forEach(sound => sound.volume(volume)), [volume])
+    return useCallback(name => sounds.current?.[name]?.play(), [])
+}
 
-const createCollectible = (id, x) => ({
-    id,
-    x,
-    type: Math.random() > 0.5 ? 'voucher' : 'coin',
-})
+function buildMascotSheet() {
+    const sheet = document.createElement('canvas'); sheet.width = 64 * 7; sheet.height = 72; const c = sheet.getContext('2d')
+    for (let frame = 0; frame < 7; frame += 1) {
+        const x = frame * 64; const bounce = frame < 4 ? [2, 0, 2, 4][frame] : 2; const leg = frame % 2 ? 7 : -7
+        c.save(); c.translate(x + 32, 50 + bounce); c.shadowColor = 'rgba(15, 23, 42, .65)'; c.shadowBlur = 7; c.shadowOffsetY = 3; c.fillStyle = '#6d28d9'; c.beginPath(); c.roundRect(-15, -26, 30, 36, 11); c.fill(); c.shadowColor = 'transparent'; c.strokeStyle = '#f5f3ff'; c.lineWidth = 2; c.stroke(); c.fillStyle = '#ffd6b5'; c.beginPath(); c.arc(0, -36, 14, 0, Math.PI * 2); c.fill(); c.strokeStyle = '#312e81'; c.stroke(); c.fillStyle = '#1e1635'; c.fillRect(-12, -45, 24, 8); c.fillStyle = '#fff'; c.fillRect(-11, -8, 22, 10); c.fillStyle = '#111827'; c.fillRect(-11, 10, 9, 6); c.fillRect(2, 10 + leg / 5, 9, 6); c.fillStyle = '#a78bfa'; c.fillRect(-23, -18, 8, 21); c.fillRect(15, -18, 8, 21); c.restore()
+    }
+    return sheet
+}
 
-const JUMP_HEIGHT = 58
-const MIN_OBSTACLE_GAP = 180
+function useCampusRunner(canvasRef, onHud, onEvent) {
+    const engine = useRef(null)
+    const resize = useCallback(() => { const canvas = canvasRef.current; if (!canvas) return; const rect = canvas.getBoundingClientRect(); const dpr = Math.min(window.devicePixelRatio || 1, 2); canvas.width = rect.width * dpr; canvas.height = rect.height * dpr; canvas.getContext('2d').setTransform(dpr, 0, 0, dpr, 0, 0); if (engine.current) { engine.current.w = rect.width; engine.current.h = rect.height } }, [canvasRef])
+    useEffect(() => {
+        resize(); const observer = new ResizeObserver(resize); if (canvasRef.current) observer.observe(canvasRef.current); return () => observer.disconnect()
+    }, [resize, canvasRef])
+    useEffect(() => {
+        const saved = Number(localStorage.getItem('campusthread-high-score')) || 0
+        engine.current = { w: 700, h: 370, running: false, paused: false, over: false, last: 0, elapsed: 0, score: 0, distance: 0, coins: 0, combo: 0, lives: 3, jump: 0, velocity: 0, obstacles: [], items: [], particles: [], clouds: Array.from({ length: 6 }, (_, i) => ({ x: i * 150, y: 25 + (i % 3) * 34, size: 18 + i * 4 })), birds: [], spawn: 0, itemSpawn: 0, shake: 0, flash: 0, slow: 0, shield: false, boost: 0, double: 0, magnet: 0, highScore: saved, sheet: buildMascotSheet(), frame: 0, lastHud: 0 }
+        let id
+        const loop = now => { tick(now); id = requestAnimationFrame(loop) }; id = requestAnimationFrame(loop)
+        return () => cancelAnimationFrame(id)
+    }, [])
+    const particle = (e, color, count = 12) => { for (let i = 0; i < count; i += 1) e.particles.push({ x: 86, y: e.h - 75, vx: random(-110, 150), vy: random(-180, -30), life: random(.35, .8), color, size: random(2, 5) }) }
+    const event = (type, payload = {}) => onEvent({ type, ...payload, id: `${Date.now()}-${Math.random()}` })
+    const hit = e => { if (e.shield) { e.shield = false; particle(e, '#60a5fa', 24); event('shield'); return } e.lives -= 1; e.combo = 0; e.shake = 18; e.flash = 1; e.slow = .3; particle(e, '#fb7185', 28); event('hit'); if (e.lives <= 0) { e.running = false; e.over = true; e.highScore = Math.max(e.highScore, Math.floor(e.score)); localStorage.setItem('campusthread-high-score', e.highScore); event('gameover', { score: Math.floor(e.score) }) } }
+    const collect = (e, item) => { const multiplier = e.double > 0 ? 2 : 1; if (item.type === 'coin') { e.coins += 10 * multiplier; e.score += 10 * multiplier; e.combo += 1; particle(e, '#fbbf24'); event('coin', { amount: 10 * multiplier }) } else if (item.type === 'voucher' || item.type === 'gift' || item.type === 'bag') { e.score += 25; particle(e, '#c084fc'); event('voucher', { label: item.type === 'bag' ? 'Shopping bag +25' : 'Reward collected' }) } else { e[item.type] = item.type === 'shield' ? true : 8; particle(e, item.type === 'boost' ? '#38bdf8' : '#a78bfa', 20); event('power', { label: `${item.type} activated` }) } }
+    function tick(now) {
+        const canvas = canvasRef.current; const e = engine.current; if (!canvas || !e) return; const ctx = canvas.getContext('2d'); const dt = Math.min(.04, (now - (e.last || now)) / 1000); e.last = now
+        if (e.running && !e.paused) {
+            const step = dt * (e.slow > 0 ? .25 : 1); e.elapsed += step; e.slow -= dt; e.boost -= step; e.double -= step; e.magnet -= step; const level = Math.floor(e.elapsed / 20) + 1; const speed = (190 + level * 22) * (e.boost > 0 ? 1.35 : 1)
+            e.velocity -= 1200 * step; e.jump += e.velocity * step; if (e.jump < 0) { if (e.velocity < -100) { particle(e, '#d6b98a', 8); event('land') } e.jump = 0; e.velocity = 0 }
+            e.spawn -= step; e.itemSpawn -= step; if (e.spawn <= 0) { e.obstacles.push({ type: TYPES[Math.floor(Math.random() * TYPES.length)], x: e.w + 50, size: random(.75, 1.18) }); e.spawn = Math.max(.55, 1.5 - level * .08) } if (e.itemSpawn <= 0) { e.items.push({ type: ITEMS[Math.floor(Math.random() * ITEMS.length)], x: e.w + 30, y: e.h - random(115, 155), bob: Math.random() * 6 }); e.itemSpawn = random(1.1, 2.4) }
+            e.obstacles.forEach(o => o.x -= speed * step); e.items.forEach(i => { i.x -= speed * step; if (e.magnet > 0 && i.type === 'coin' && i.x < 280) i.y += (e.h - 95 - i.y) * step * 5 }); e.obstacles = e.obstacles.filter(o => o.x > -80); e.items = e.items.filter(i => i.x > -40)
+            e.obstacles = e.obstacles.filter(o => { if (o.x < 102 && o.x > 43 && e.jump < 37) { hit(e); return false } return true }); e.items = e.items.filter(i => { if (i.x < 120 && i.x > 40 && Math.abs((e.h - 68 - e.jump) - i.y) < 70) { collect(e, i); return false } return true })
+        }
+        e.particles.forEach(p => { p.life -= dt; p.x += p.vx * dt; p.y += p.vy * dt; p.vy += 360 * dt }); e.particles = e.particles.filter(p => p.life > 0); e.shake = Math.max(0, e.shake - dt * 44); e.flash = Math.max(0, e.flash - dt * 3)
+        draw(ctx, e, now / 1000)
+        if (now - e.lastHud > 120) { e.lastHud = now; onHud({ score: Math.floor(e.score), distance: Math.floor(e.elapsed * 13), coins: e.coins, combo: e.combo, lives: e.lives, level: Math.floor(e.elapsed / 20) + 1, progress: Math.min(100, (e.score % 250) / 2.5), mission: Math.min(100, e.coins / 5), highScore: e.highScore, running: e.running, paused: e.paused, over: e.over, shield: e.shield, boost: e.boost > 0, double: e.double > 0 }) }
+    }
+    function draw(ctx, e, time) {
+        const { w, h } = e; ctx.clearRect(0, 0, w, h); const night = (Math.sin(time / 100) + 1) / 2; const sky = ctx.createLinearGradient(0, 0, 0, h); sky.addColorStop(0, `rgb(${35 + night * 45}, ${70 + night * 45}, ${145 + night * 45})`); sky.addColorStop(1, '#dbeafe'); ctx.fillStyle = sky; ctx.fillRect(0, 0, w, h)
+        e.clouds.forEach(c => { c.x -= .22 + night * .12; if (c.x < -90) c.x = w + 60; ctx.fillStyle = `rgba(255,255,255,${.16 + night * .25})`; ctx.beginPath(); ctx.arc(c.x, c.y, c.size, 0, Math.PI * 2); ctx.arc(c.x + c.size, c.y + 5, c.size * .8, 0, Math.PI * 2); ctx.fill() })
+        const offset = (time * 45) % 160; ctx.fillStyle = '#64748b'; for (let x = -160 + offset; x < w + 160; x += 160) { ctx.fillRect(x, h - 210, 88, 105); ctx.fillStyle = '#fde68a'; for (let y = h - 195; y < h - 125; y += 22) ctx.fillRect(x + 12, y, 10, 9); ctx.fillStyle = '#64748b' }
+        ctx.fillStyle = '#86efac'; ctx.fillRect(0, h - 112, w, 30); const scroll = (time * 180) % 110; for (let x = -110 + scroll; x < w + 110; x += 110) { ctx.fillStyle = '#166534'; ctx.beginPath(); ctx.arc(x + 55, h - 128, 21, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = '#854d0e'; ctx.fillRect(x + 52, h - 112, 6, 26); ctx.fillStyle = '#475569'; ctx.fillRect(x + 89, h - 170, 4, 58); ctx.fillStyle = '#fef3c7'; ctx.fillRect(x + 82, h - 170, 18, 5) }
+        ctx.fillStyle = '#cbd5e1'; ctx.fillRect(0, h - 82, w, 18); ctx.fillStyle = '#334155'; ctx.fillRect(0, h - 64, w, 64); ctx.strokeStyle = '#f8fafc'; ctx.lineWidth = 4; ctx.setLineDash([22, 25]); ctx.lineDashOffset = -time * 260; ctx.beginPath(); ctx.moveTo(0, h - 31); ctx.lineTo(w, h - 31); ctx.stroke(); ctx.setLineDash([])
+        e.obstacles.forEach(o => drawObstacle(ctx, o, h)); e.items.forEach(i => drawItem(ctx, i, h, time)); e.particles.forEach(p => { ctx.globalAlpha = clamp(p.life * 2, 0, 1); ctx.fillStyle = p.color; ctx.fillRect(p.x, p.y, p.size, p.size); ctx.globalAlpha = 1 })
+        ctx.save(); ctx.translate(e.shake ? random(-e.shake, e.shake) : 0, e.shake ? random(-e.shake / 3, e.shake / 3) : 0); const y = h - 68 - e.jump; ctx.globalAlpha = .35; ctx.fillStyle = '#111827'; ctx.beginPath(); ctx.ellipse(84, h - 68, 31 + e.jump / 8, 8 - Math.min(3, e.jump / 22), 0, 0, Math.PI * 2); ctx.fill(); ctx.globalAlpha = 1; ctx.translate(38, y); ctx.rotate(e.jump > 0 ? -.09 : 0); const frame = e.running ? Math.floor(time * 12) % 4 : e.over ? 6 : 4; ctx.drawImage(e.sheet, frame * 64, 0, 64, 72, 0, -5, -70, 78, 88); if (e.boost > 0) { ctx.globalCompositeOperation = 'screen'; ctx.fillStyle = 'rgba(56,189,248,.25)'; ctx.fillRect(-10, -45, 82, 72); ctx.globalCompositeOperation = 'source-over' } ctx.restore(); if (e.flash) { ctx.fillStyle = `rgba(239,68,68,${e.flash * .22})`; ctx.fillRect(0, 0, w, h) }
+    }
+    const drawObstacle = (ctx, o, h) => { ctx.save(); ctx.translate(o.x, h - 68); ctx.scale(o.size, o.size); const colors = { box: '#b45309', bench: '#92400e', cart: '#94a3b8', book: '#ef4444', bike: '#0f766e', cone: '#f97316', tree: '#15803d' }; ctx.fillStyle = colors[o.type]; if (o.type === 'cone') { ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(23, 0); ctx.lineTo(12, -38); ctx.fill() } else if (o.type === 'bike') { ctx.strokeStyle = colors.bike; ctx.lineWidth = 5; ctx.beginPath(); ctx.arc(7, -10, 9, 0, 7); ctx.arc(34, -10, 9, 0, 7); ctx.moveTo(7, -10); ctx.lineTo(20, -31); ctx.lineTo(34, -10); ctx.moveTo(20, -31); ctx.lineTo(29, -32); ctx.stroke() } else if (o.type === 'tree') { ctx.fillRect(13, -38, 8, 38); ctx.fillStyle = '#22c55e'; ctx.beginPath(); ctx.arc(17, -49, 23, 0, 7); ctx.fill() } else { ctx.fillRect(0, -35, o.type === 'bench' ? 48 : 29, 35); if (o.type === 'bench') { ctx.fillStyle = '#78350f'; ctx.fillRect(-4, -47, 56, 10) } } ctx.restore() }
+    const drawItem = (ctx, i, h, time) => { const y = i.y + Math.sin(time * 5 + i.bob) * 8; ctx.save(); ctx.translate(i.x, y); const colors = { coin: '#fbbf24', bag: '#22c55e', voucher: '#a855f7', gift: '#ec4899', magnet: '#ef4444', shield: '#60a5fa', boost: '#38bdf8', double: '#f97316' }; ctx.shadowColor = colors[i.type]; ctx.shadowBlur = 13; ctx.fillStyle = colors[i.type]; if (i.type === 'coin') { ctx.beginPath(); ctx.arc(0, 0, 12, 0, 7); ctx.fill(); ctx.fillStyle = '#fff7ed'; ctx.font = 'bold 14px sans-serif'; ctx.fillText('$', -4, 5) } else { ctx.fillRect(-11, -11, 22, 22); ctx.fillStyle = '#fff'; ctx.font = 'bold 11px sans-serif'; ctx.fillText(i.type === 'shield' ? 'S' : i.type === 'boost' ? 'ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â»' : i.type === 'magnet' ? 'M' : '+', -4, 4) } ctx.restore() }
+    const command = useCallback(action => { const e = engine.current; if (!e) return; if (action === 'start') { Object.assign(e, { ...INITIAL, running: true, highScore: e.highScore, obstacles: [], items: [], particles: [], elapsed: 0, spawn: .8, itemSpawn: 1.2 }); event('start') } if (action === 'jump' && e.running && !e.paused && e.jump === 0) { e.velocity = 510; particle(e, '#d6b98a', 6); event('jump') } if (action === 'pause' && e.running) e.paused = !e.paused }, [])
+    return command
+}
+
+function Stat({ label, value, accent }) { return <div className="rounded-2xl border border-white/15 bg-white/10 px-3 py-2 backdrop-blur"><p className="text-[10px] font-bold uppercase tracking-widest text-white/60">{label}</p><p className={`mt-0.5 text-lg font-black ${accent || 'text-white'}`}>{value}</p></div> }
 
 export default function Game() {
-    const { theme } = useTheme()
-    const { notifications } = useNotification()
+    const { theme } = useTheme(); const canvasRef = useRef(null); const sceneRef = useRef(null); const [hud, setHud] = useState(INITIAL); const [events, setEvents] = useState([]); const [volume, setVolume] = useState(.45); const play = useGameAudio(volume)
+    const onEvent = useCallback(event => { if ({ jump: 1, coin: 1, voucher: 1, hit: 1, start: 1 }[event.type]) play(event.type === 'start' ? 'click' : event.type); if (event.type === 'hit') gsap.fromTo(sceneRef.current, { x: -8 }, { x: 8, duration: .05, repeat: 5, yoyo: true, clearProps: 'x' }); if (event.type !== 'land' && event.type !== 'start') { setEvents(list => [...list.slice(-3), event]); setTimeout(() => setEvents(list => list.filter(item => item.id !== event.id)), 1300) } }, [play])
+    const command = useCampusRunner(canvasRef, setHud, onEvent)
     const isDark = theme === 'dark'
-
-    const [stats, setStats] = useState({ coins: 0, vouchers: 0 })
-    const [leaderboard, setLeaderboard] = useState([])
-    const audioContextRef = useRef(null)
-    const [game, setGame] = useState({
-        running: false,
-        over: false,
-        paused: false,
-        jumpHeight: 0,
-        obstacles: [],
-        collectibles: [],
-        score: 0,
-        collectedCoins: 0,
-        collectedVouchers: 0,
-        reward: null,
-        runs: 0,
-    })
-
-    useEffect(() => {
-        try {
-            const savedStats = window.localStorage.getItem('campusthread-runner-stats')
-            if (savedStats) {
-                const parsedStats = JSON.parse(savedStats)
-                if (parsedStats) {
-                    setStats({ coins: Number(parsedStats.coins) || 0, vouchers: Number(parsedStats.vouchers) || 0 })
-                }
-            }
-
-            const savedLeaderboard = window.localStorage.getItem('campusthread-runner-leaderboard')
-            if (savedLeaderboard) {
-                const parsedLeaderboard = JSON.parse(savedLeaderboard)
-                if (Array.isArray(parsedLeaderboard)) {
-                    setLeaderboard(parsedLeaderboard)
-                }
-            }
-        } catch {
-            // ignore storage issues
-        }
-    }, [])
-
-    useEffect(() => {
-        window.localStorage.setItem('campusthread-runner-stats', JSON.stringify(stats))
-    }, [stats])
-
-    const ensureAudio = () => {
-        if (typeof window === 'undefined') return null
-        if (!audioContextRef.current) {
-            const AudioContext = window.AudioContext || window.webkitAudioContext
-            if (!AudioContext) return null
-            audioContextRef.current = new AudioContext()
-        }
-
-        if (audioContextRef.current.state === 'suspended') {
-            audioContextRef.current.resume()
-        }
-
-        return audioContextRef.current
-    }
-
-    const playSound = (type) => {
-        const ctx = ensureAudio()
-        if (!ctx) return
-
-        const now = ctx.currentTime
-        const oscillator = ctx.createOscillator()
-        const gain = ctx.createGain()
-
-        oscillator.connect(gain)
-        gain.connect(ctx.destination)
-
-        if (type === 'jump') {
-            oscillator.type = 'triangle'
-            oscillator.frequency.setValueAtTime(720, now)
-            oscillator.frequency.exponentialRampToValueAtTime(980, now + 0.12)
-        } else if (type === 'collect') {
-            oscillator.type = 'sine'
-            oscillator.frequency.setValueAtTime(860, now)
-            oscillator.frequency.exponentialRampToValueAtTime(1180, now + 0.12)
-        } else {
-            oscillator.type = 'square'
-            oscillator.frequency.setValueAtTime(280, now)
-            oscillator.frequency.exponentialRampToValueAtTime(180, now + 0.18)
-        }
-
-        gain.gain.setValueAtTime(0.0001, now)
-        gain.gain.exponentialRampToValueAtTime(0.06, now + 0.01)
-        gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.2)
-
-        oscillator.start(now)
-        oscillator.stop(now + 0.2)
-    }
-
-    useEffect(() => {
-        if (!game.running || game.paused || game.over) return
-
-        const interval = window.setInterval(() => {
-            setGame((prev) => {
-                if (!prev.running || prev.paused || prev.over) return prev
-
-                let nextJumpHeight = prev.jumpHeight > 0 ? prev.jumpHeight - 4 : 0
-                let nextObstacles = prev.obstacles
-                    .map((obstacle) => ({ ...obstacle, x: obstacle.x - 8 }))
-                    .filter((obstacle) => obstacle.x > -60)
-                let nextCollectibles = prev.collectibles
-                    .map((item) => ({ ...item, x: item.x - 7 }))
-                    .filter((item) => item.x > -60)
-
-                const shouldSpawnObstacle = nextObstacles.length === 0 || nextObstacles[nextObstacles.length - 1].x < MIN_OBSTACLE_GAP
-                if (shouldSpawnObstacle && Math.random() > 0.45) {
-                    nextObstacles = [...nextObstacles, createObstacle(Date.now() + Math.random(), 320)]
-                }
-
-                if (prev.score > 16 && Math.random() > 0.7) {
-                    nextCollectibles = [...nextCollectibles, createCollectible(Date.now() + Math.random(), 320)]
-                }
-
-                let collectedCoins = prev.collectedCoins
-                let collectedVouchers = prev.collectedVouchers
-
-                nextCollectibles = nextCollectibles.filter((item) => {
-                    const hit = item.x < 90 && item.x > 38 && nextJumpHeight === 0
-                    if (!hit) return true
-
-                    if (item.type === 'coin') {
-                        collectedCoins += 1
-                        playSound('collect')
-                    } else {
-                        collectedVouchers += 1
-                        playSound('collect')
-                    }
-
-                    return false
-                })
-
-                const hitObstacle = nextObstacles.some((obstacle) => obstacle.x < 92 && obstacle.x > 40 && nextJumpHeight === 0)
-                const nextScore = prev.score + 1
-
-                if (hitObstacle) {
-                    playSound('crash')
-                    const rewardCoins = Math.max(6, Math.floor(nextScore / 12) + collectedCoins * 2)
-                    const rewardVouchers = collectedVouchers > 0 ? 1 : 0
-
-                    return {
-                        ...prev,
-                        running: false,
-                        over: true,
-                        jumpHeight: 0,
-                        obstacles: nextObstacles,
-                        collectibles: nextCollectibles,
-                        score: nextScore,
-                        collectedCoins,
-                        collectedVouchers,
-                        reward: { coins: rewardCoins, vouchers: rewardVouchers },
-                    }
-                }
-
-                return {
-                    ...prev,
-                    jumpHeight: nextJumpHeight,
-                    obstacles: nextObstacles,
-                    collectibles: nextCollectibles,
-                    score: nextScore,
-                    collectedCoins,
-                    collectedVouchers,
-                    reward: null,
-                }
-            })
-        }, 40)
-
-        return () => window.clearInterval(interval)
-    }, [game.running, game.paused, game.over])
-
-    useEffect(() => {
-        const onKeyDown = (event) => {
-            if (event.code === 'Space' || event.code === 'ArrowUp') {
-                event.preventDefault()
-                jump()
-            }
-        }
-
-        window.addEventListener('keydown', onKeyDown)
-        return () => window.removeEventListener('keydown', onKeyDown)
-    }, [game.running, game.over, game.paused])
-
-    const jump = () => {
-        if (!game.running || game.over || game.paused) return
-        playSound('jump')
-        setGame((prev) => ({ ...prev, jumpHeight: prev.jumpHeight > 0 ? prev.jumpHeight : JUMP_HEIGHT }))
-    }
-
-    const startGame = () => {
-        playSound('jump')
-        setGame({
-            running: true,
-            over: false,
-            paused: false,
-            jumpHeight: 0,
-            obstacles: [],
-            collectibles: [],
-            score: 0,
-            collectedCoins: 0,
-            collectedVouchers: 0,
-            reward: null,
-            runs: game.runs + 1,
-        })
-    }
-
-    const togglePause = () => {
-        if (!game.running || game.over) return
-        setGame((prev) => ({ ...prev, paused: !prev.paused }))
-    }
-
-    useEffect(() => {
-        if (!game.reward) return
-
-        setStats((prev) => ({
-            coins: prev.coins + game.reward.coins,
-            vouchers: prev.vouchers + game.reward.vouchers,
-        }))
-
-        setLeaderboard((prev) => {
-            const entry = {
-                score: game.score,
-                coins: game.reward.coins,
-                vouchers: game.reward.vouchers,
-                label: `Run ${game.runs}`,
-            }
-
-            const updated = [...prev, entry]
-                .sort((a, b) => b.score - a.score)
-                .slice(0, 5)
-
-            window.localStorage.setItem('campusthread-runner-leaderboard', JSON.stringify(updated))
-            return updated
-        })
-    }, [game.reward, game.score, game.runs])
-
-    const pageClass = isDark ? 'bg-slate-950 text-slate-100' : 'bg-slate-50 text-slate-950'
-    const leaderboardItems = useMemo(() => leaderboard.slice(0, 5), [leaderboard])
-    const surfaceClass = isDark
-        ? 'border-white/10 bg-slate-900 text-slate-100 shadow-black/30'
-        : 'border-slate-200 bg-white text-slate-950 shadow-slate-200/70'
-    const mutedText = isDark ? 'text-slate-300' : 'text-slate-600'
-
-    return (
-        <div className={cx('min-h-screen transition-colors duration-300', pageClass)}>
-            <Navbar links={NAV_LINKS} />
-            <NotificationToast notifications={notifications} />
-
-            <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-                <section className={cx('overflow-hidden rounded-3xl border shadow-2xl', surfaceClass)}>
-                    <div className="grid gap-8 p-5 sm:p-8 lg:grid-cols-[0.95fr_1.05fr]">
-                        <div>
-                            <p className={cx('mb-4 inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-black uppercase tracking-[0.24em]', isDark ? 'border-violet-300/20 bg-violet-300/10 text-violet-200' : 'border-violet-200 bg-violet-50 text-violet-700')}>
-                                <Gamepad2 size={14} />
-                                Campus Dash
-                            </p>
-                            <h1 className="text-3xl font-black tracking-normal sm:text-4xl">Run, dodge, and collect rewards</h1>
-                            <p className={cx('mt-4 max-w-xl text-base leading-7', mutedText)}>
-                                Tap or press space to jump through campus obstacles and grab shopping bags, vouchers, and coins. Every run earns you rewards for your next shopping trip.
-                            </p>
-
-                            <div className="mt-6 grid gap-3 sm:grid-cols-3">
-                                <div className={cx('rounded-2xl border p-3', isDark ? 'border-white/10 bg-slate-950/70' : 'border-slate-200 bg-slate-50')}>
-                                    <div className="flex items-center gap-2 text-sm font-bold text-violet-700">
-                                        <Coins size={16} /> Coins
-                                    </div>
-                                    <p className="mt-2 text-2xl font-black">{stats.coins}</p>
-                                </div>
-                                <div className={cx('rounded-2xl border p-3', isDark ? 'border-white/10 bg-slate-950/70' : 'border-slate-200 bg-slate-50')}>
-                                    <div className="flex items-center gap-2 text-sm font-bold text-violet-700">
-                                        <Gift size={16} /> Vouchers
-                                    </div>
-                                    <p className="mt-2 text-2xl font-black">{stats.vouchers}</p>
-                                </div>
-                                <div className={cx('rounded-2xl border p-3', isDark ? 'border-white/10 bg-slate-950/70' : 'border-slate-200 bg-slate-50')}>
-                                    <div className="flex items-center gap-2 text-sm font-bold text-violet-700">
-                                        <Trophy size={16} /> Runs
-                                    </div>
-                                    <p className="mt-2 text-2xl font-black">{game.runs}</p>
-                                </div>
-                            </div>
-
-                            <div className="mt-6 flex flex-wrap gap-3">
-                                <button type="button" onClick={startGame} className="inline-flex items-center gap-2 rounded-lg bg-violet-700 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-violet-800">
-                                    <Play size={16} /> {game.running ? 'Restart Run' : 'Start Run'}
-                                </button>
-                                <button type="button" onClick={togglePause} className={cx('rounded-lg border px-4 py-2.5 text-sm font-bold transition', isDark ? 'border-white/10 text-slate-200 hover:bg-white/5' : 'border-slate-200 text-slate-700 hover:bg-slate-100')}>
-                                    {game.paused ? 'Resume' : 'Pause'}
-                                </button>
-                                <Link to="/shop" className={cx('rounded-lg border px-4 py-2.5 text-sm font-bold transition', isDark ? 'border-white/10 text-slate-200 hover:bg-white/5' : 'border-slate-200 text-slate-700 hover:bg-slate-100')}>
-                                    Shop rewards
-                                </Link>
-                            </div>
-                        </div>
-
-                        <div className="space-y-4">
-                            <div className={cx('rounded-3xl border p-3 shadow-inner', isDark ? 'border-white/10 bg-slate-950/70' : 'border-slate-200 bg-slate-100')}>
-                                <div className="mb-3 flex items-center justify-between px-1">
-                                    <span className="text-sm font-black uppercase tracking-[0.24em] text-violet-700">Live run</span>
-                                    <span className="text-sm font-bold">Score {game.score}</span>
-                                </div>
-
-                                <div
-                                    onPointerDown={jump}
-                                    className={cx('relative h-64 overflow-hidden rounded-2xl border', isDark ? 'border-white/10 bg-gradient-to-b from-sky-500/30 to-slate-950' : 'border-slate-200 bg-gradient-to-b from-sky-300 to-slate-100')}
-                                    style={{ perspective: '900px' }}
-                                >
-                                    <div className="absolute inset-x-0 bottom-0 h-20 bg-amber-400/80" />
-                                    <div className="absolute inset-x-0 top-0 h-8 bg-white/20" />
-                                    <div className="absolute left-4 top-4 h-8 w-16 rounded-full bg-white/25 blur-xl" />
-                                    <div className="absolute bottom-16 right-6 h-10 w-10 rounded-full bg-white/20 blur-lg" />
-                                    <div className="absolute bottom-10 left-8 h-12 w-12 rounded-2xl bg-violet-700 shadow-[0_12px_24px_rgba(0,0,0,0.24)]" style={{ transform: `translateY(-${game.jumpHeight}px) rotateX(10deg) rotateY(-10deg) scale(1.02)` }} />
-                                    <div className="absolute bottom-10 left-8 h-12 w-12 rounded-full bg-white/35" style={{ transform: `translateY(-${game.jumpHeight}px) rotateX(10deg) rotateY(-10deg)` }} />
-
-                                    {game.obstacles.map((obstacle) => (
-                                        <div key={obstacle.id} className="absolute bottom-10" style={{ left: `${obstacle.x}px`, transform: 'rotate(-2deg)' }}>
-                                            {obstacle.type === 'barrier' ? (
-                                                <div className="h-12 w-8 rounded-md border border-slate-800 bg-red-600 shadow-[0_8px_16px_rgba(0,0,0,0.3)]" />
-                                            ) : (
-                                                <div className="h-10 w-10 rounded-t-full bg-orange-500 shadow-[0_8px_16px_rgba(0,0,0,0.25)]" />
-                                            )}
-                                        </div>
-                                    ))}
-
-                                    {game.collectibles.map((item) => (
-                                        <div key={item.id} className="absolute bottom-12" style={{ left: `${item.x}px`, transform: 'rotate(6deg)' }}>
-                                            {item.type === 'coin' ? (
-                                                <Coins size={24} className="text-amber-400 drop-shadow-[0_3px_4px_rgba(0,0,0,0.35)]" />
-                                            ) : (
-                                                <Gift size={24} className="text-emerald-400 drop-shadow-[0_3px_4px_rgba(0,0,0,0.35)]" />
-                                            )}
-                                        </div>
-                                    ))}
-
-                                    {!game.running && !game.over && (
-                                        <div className="absolute inset-0 flex items-center justify-center bg-slate-950/15 px-4 text-center">
-                                            <div className="rounded-2xl border border-white/20 bg-slate-950/75 px-4 py-4 text-sm font-semibold text-white">
-                                                Tap the game area or press space to start.
-                                            </div>
-                                        </div>
-                                    )}
-
-                                    {game.paused && (
-                                        <div className="absolute inset-0 flex items-center justify-center bg-slate-950/20 px-4 text-center">
-                                            <div className="rounded-2xl border border-white/20 bg-slate-950/75 px-4 py-4 text-sm font-semibold text-white">
-                                                Paused. Tap resume to continue.
-                                            </div>
-                                        </div>
-                                    )}
-
-                                    {game.over && (
-                                        <div className="absolute inset-0 flex items-center justify-center bg-slate-950/70 px-4 text-center">
-                                            <div className="rounded-2xl border border-violet-300/20 bg-slate-900/90 px-5 py-5 text-white shadow-xl">
-                                                <div className="flex items-center justify-center gap-2 text-violet-200">
-                                                    <Sparkles size={18} />
-                                                    <span className="text-sm font-black uppercase tracking-[0.24em]">Run complete</span>
-                                                </div>
-                                                <p className="mt-3 text-xl font-black">Score {game.score}</p>
-                                                <p className="mt-2 text-sm text-slate-300">You collected {game.collectedCoins} coins and {game.collectedVouchers} vouchers.</p>
-                                                <div className="mt-4 flex items-center justify-center gap-3 text-sm font-semibold">
-                                                    <span className="rounded-full bg-amber-400/20 px-3 py-1 text-amber-300">+{game.reward?.coins || 0} coins</span>
-                                                    <span className="rounded-full bg-emerald-400/20 px-3 py-1 text-emerald-300">+{game.reward?.vouchers || 0} vouchers</span>
-                                                </div>
-                                                <button type="button" onClick={startGame} className="mt-5 inline-flex items-center gap-2 rounded-lg bg-violet-700 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-violet-800">
-                                                    <RotateCcw size={16} /> Play again
-                                                </button>
-                                            </div>
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
-
-                            <div className={cx('rounded-2xl border p-4 text-sm', isDark ? 'border-white/10 bg-slate-950/60' : 'border-slate-200 bg-slate-50')}>
-                                <p className="font-black uppercase tracking-[0.24em] text-violet-700">How it works</p>
-                                <ul className={cx('mt-3 space-y-2', mutedText)}>
-                                    <li>• Jump over obstacles to stay alive.</li>
-                                    <li>• Grab coins and vouchers for bonus rewards.</li>
-                                    <li>• Spend your rewards in the shop for discounts and offers.</li>
-                                </ul>
-                            </div>
-
-                            <div className={cx('rounded-2xl border p-4 text-sm', isDark ? 'border-white/10 bg-slate-950/60' : 'border-slate-200 bg-slate-50')}>
-                                <div className="flex items-center justify-between">
-                                    <p className="font-black uppercase tracking-[0.24em] text-violet-700">Top runs</p>
-                                    <span className="text-xs font-semibold text-slate-500">Local leaderboard</span>
-                                </div>
-                                <div className="mt-3 space-y-2">
-                                    {leaderboardItems.length > 0 ? leaderboardItems.map((entry, index) => (
-                                        <div key={`${entry.label}-${index}`} className={cx('flex items-center justify-between rounded-lg border px-3 py-2', isDark ? 'border-white/10 bg-slate-900/70' : 'border-slate-200 bg-white')}>
-                                            <div>
-                                                <p className="text-sm font-bold">{entry.label}</p>
-                                                <p className="text-xs text-slate-500">{entry.score} pts • {entry.coins} coins • {entry.vouchers} vouchers</p>
-                                            </div>
-                                            <span className="text-sm font-black text-violet-700">#{index + 1}</span>
-                                        </div>
-                                    )) : (
-                                        <p className={cx('rounded-lg border px-3 py-3 text-sm', isDark ? 'border-white/10 text-slate-400' : 'border-slate-200 text-slate-500')}>No runs yet. Start one and your best scores will appear here.</p>
-                                    )}
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </section>
-            </main>
-        </div>
-    )
+    return <div className={isDark ? 'min-h-screen bg-slate-950 text-white' : 'min-h-screen bg-slate-100 text-slate-950'}><Navbar links={NAV_LINKS} /><main className="mx-auto max-w-7xl px-4 py-7 sm:px-6"><div className="mb-5 flex flex-wrap items-end justify-between gap-3"><div><p className="text-xs font-black uppercase tracking-[.25em] text-violet-500">CampusThread Arcade</p><h1 className="mt-1 text-3xl font-black sm:text-4xl">Campus Dash</h1></div><div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs shadow-sm dark:border-white/10 dark:bg-white/5"><Settings2 size={15} /><input aria-label="Game volume" className="accent-violet-600" type="range" min="0" max="1" step=".05" value={volume} onChange={e => setVolume(Number(e.target.value))} /></div></div><div ref={sceneRef} className="overflow-hidden rounded-3xl border border-white/15 bg-slate-900 shadow-2xl shadow-violet-950/30"><div className="relative"><canvas ref={canvasRef} onPointerDown={() => hud.running ? command('jump') : command('start')} className="block h-[390px] w-full touch-manipulation cursor-pointer sm:h-[480px]" aria-label="Campus Dash runner game" /><div className="pointer-events-none absolute inset-x-3 top-3 grid grid-cols-3 gap-2 sm:grid-cols-5"><Stat label="Score" value={hud.score} accent="text-amber-300" /><Stat label="Distance" value={`${hud.distance}m`} /><Stat label="Coins" value={hud.coins} accent="text-amber-300" /><Stat label="Best" value={hud.highScore} /><Stat label="Combo" value={`x${hud.combo}`} /></div><AnimatePresence>{!hud.running && !hud.over && <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0 grid place-items-center bg-slate-950/25"><motion.button whileHover={{ scale: 1.04 }} whileTap={{ scale: .97 }} onClick={() => command('start')} className="pointer-events-auto rounded-2xl border border-white/20 bg-slate-950/70 px-6 py-4 font-bold text-white shadow-xl backdrop-blur"><Play className="mx-auto mb-2" />Tap to start your run</motion.button></motion.div>}</AnimatePresence><AnimatePresence>{(hud.paused || hud.over) && <Overlay title={hud.over ? `Run complete: ${hud.score} points` : 'Paused'} action={hud.over ? 'Run again' : 'Resume'} onClick={() => command(hud.over ? 'start' : 'pause')} />}</AnimatePresence></div><div className="grid gap-2 border-t border-white/10 bg-slate-900 px-4 py-3 sm:grid-cols-2"><Progress label="Reward progress" value={hud.progress} color="bg-violet-500" /><Progress label="Daily: earn 500 coins" value={hud.mission} color="bg-amber-400" /></div><div className="flex flex-wrap items-center justify-between gap-3 bg-slate-950 px-4 py-3 text-white"><div className="flex gap-2 text-xs font-bold text-white/75"><Badge active={hud.shield} icon={<Shield size={14} />} text="Shield" /><Badge active={hud.boost} icon={<Zap size={14} />} text="Boost" /><Badge active={hud.double} icon={<Coins size={14} />} text="2x coins" /></div><div className="flex gap-2"><button onClick={() => command('pause')} className="rounded-lg bg-white/10 px-3 py-2 text-xs font-bold hover:bg-white/20"><Pause size={14} className="inline mr-1" />{hud.paused ? 'Resume' : 'Pause'}</button><button onClick={() => command('start')} className="rounded-lg bg-violet-600 px-3 py-2 text-xs font-bold hover:bg-violet-500"><RotateCcw size={14} className="inline mr-1" />Restart</button></div></div></div></main><div className="pointer-events-none fixed inset-0 z-50 overflow-hidden"><AnimatePresence>{events.map((item, index) => <motion.div key={item.id} initial={{ opacity: 0, y: 15, scale: .7 }} animate={{ opacity: 1, y: -25, scale: 1 }} exit={{ opacity: 0, y: -45 }} className="absolute left-1/2 top-1/2 rounded-full bg-slate-950/85 px-4 py-2 text-sm font-black text-white shadow-lg" style={{ marginLeft: index * 35 }}><span className={item.type === 'coin' ? 'text-amber-300' : 'text-violet-300'}>{item.amount ? `+${item.amount}` : item.label || (item.type === 'hit' ? 'Watch out!' : 'Nice!')}</span></motion.div>)}</AnimatePresence></div></div>
 }
+
+function Progress({ label, value, color }) { return <div className="rounded-full bg-slate-950/65 px-3 py-2 text-[10px] font-bold text-white backdrop-blur"><div className="mb-1 flex justify-between"><span>{label}</span><span>{Math.round(value)}%</span></div><div className="h-1.5 overflow-hidden rounded-full bg-white/20"><motion.div className={`h-full ${color}`} animate={{ width: `${value}%` }} /></div></div> }
+function Overlay({ title, action, onClick }) { return <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0 grid place-items-center bg-slate-950/55"><motion.button whileTap={{ scale: .96 }} onClick={onClick} className="rounded-2xl border border-white/15 bg-slate-950/85 px-6 py-5 text-center text-white shadow-2xl"><strong className="block text-xl">{title}</strong><span className="mt-2 inline-block rounded-lg bg-violet-600 px-4 py-2 text-sm font-bold">{action}</span></motion.button></motion.div> }
+function Badge({ active, icon, text }) { return <span className={`inline-flex items-center gap-1 rounded-full px-2 py-1 ${active ? 'bg-violet-500 text-white' : 'bg-white/10 text-white/45'}`}>{icon}{text}</span> }
