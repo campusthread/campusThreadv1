@@ -1,22 +1,24 @@
 {
-    "version": 2,
-    "builds": [
-        {
-            "src": "frontend/package.json",
-            "use": "@vercel/static-build",
-            "config": {
-                "distDir": "dist"
-            }
-        }
-    ],
-    "routes": [
-        {
-            "src": "/api",
-            "dest": "https://campusthreadv1.onrender.com/api"
-        },
-        {
-            "src": "/api/(.*)",
-            "dest": "https://campusthreadv1.onrender.com/api/$1"
-        }
-    ]
+  "version": 2,
+  "builds": [
+    {
+      "src": "frontend/package.json",
+      "use": "@vercel/static-build",
+      "config": {
+        "distDir": "dist"
+      }
+    }
+  ],
+  "installCommand": "cd frontend && npm install",
+  "buildCommand": "cd frontend && npm run build",
+  "routes": [
+    {
+      "src": "/api",
+      "dest": "https://campusthreadv1.onrender.com/api"
+    },
+    {
+      "src": "/api/(.*)",
+      "dest": "https://campusthreadv1.onrender.com/api/$1"
+    }
+  ]
 }
