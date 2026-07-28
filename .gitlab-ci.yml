@@ -10,9 +10,9 @@ build_frontend:
         - frontend/package.json
         - frontend/package-lock.json
     paths:
-      - frontend/node_modules/
+      - frontend/.npm/
   before_script:
     - cd frontend
-    - npm ci --no-audit --no-fund
+    - npm ci --cache .npm --no-audit --no-fund
   script:
     - npm run build
