@@ -3,7 +3,7 @@ stages:
 
 build_frontend:
   stage: build
-  image: node:20-bookworm-slim
+  image: node:20.19-bookworm-slim
   cache:
     key:
       files:
